@@ -1556,6 +1556,22 @@ function computeGroupStandings(group, results) {
 function computeBracket(results) {
   const bracket = {}; // matchId -> { home: teamId, away: teamId }
 
+  // Gate: only compute bracket if enough group results are in
+  // Each phase unlocks when all matches in the previous phase have results
+  const groupResultCount = Object.keys(results).filter(id => parseInt(id) <= 72).length;
+  const r32ResultCount   = Object.keys(results).filter(id => parseInt(id) >= 73 && parseInt(id) <= 88).length;
+  const r16ResultCount   = Object.keys(results).filter(id => parseInt(id) >= 89 && parseInt(id) <= 96).length;
+  const qfResultCount    = Object.keys(results).filter(id => parseInt(id) >= 97 && parseInt(id) <= 100).length;
+  const sfResultCount    = Object.keys(results).filter(id => parseInt(id) >= 101 && parseInt(id) <= 102).length;
+
+  const groupComplete = groupResultCount >= 72;
+  const r32Complete   = r32ResultCount >= 16;
+  const r16Complete   = r16ResultCount >= 8;
+  const qfComplete    = qfResultCount >= 4;
+  const sfComplete    = sfResultCount >= 2;
+
+  if (!groupComplete) return {}; // No group stage done = no bracket yet
+
   // Step 1: compute all group standings
   const groupStandings = {};
   for (const grp of 'ABCDEFGHIJKL'.split('')) {
@@ -1620,7 +1636,7 @@ function computeBracket(results) {
     bracket[80] = { home: get1st('L'), away: get3rd(slots.m80) };
   }
 
-  // Step 5: populate later rounds from winners of previous matches
+  // Step 5: populate later rounds — only when previous phase is complete
   // Winner of match = team that scored more goals (from results)
   const getWinner = (mid) => {
     const r = results[mid];
@@ -1639,7 +1655,8 @@ function computeBracket(results) {
     return null;
   };
 
-  // Round of 16
+  // Round of 16 — only when all R32 results are in
+  if (!r32Complete) return bracket;
   bracket[89] = { home: getWinner(74), away: getWinner(77) };
   bracket[90] = { home: getWinner(73), away: getWinner(75) };
   bracket[91] = { home: getWinner(76), away: getWinner(78) };
@@ -1649,20 +1666,21 @@ function computeBracket(results) {
   bracket[95] = { home: getWinner(86), away: getWinner(88) };
   bracket[96] = { home: getWinner(85), away: getWinner(87) };
 
-  // Quarter-Finals
+  // Quarter-Finals — only when all R16 results are in
+  if (!r16Complete) return bracket;
   bracket[97]  = { home: getWinner(89), away: getWinner(90) };
   bracket[98]  = { home: getWinner(93), away: getWinner(94) };
   bracket[99]  = { home: getWinner(91), away: getWinner(92) };
   bracket[100] = { home: getWinner(95), away: getWinner(96) };
 
-  // Semi-Finals
+  // Semi-Finals — only when all QF results are in
+  if (!qfComplete) return bracket;
   bracket[101] = { home: getWinner(97),  away: getWinner(98) };
   bracket[102] = { home: getWinner(99),  away: getWinner(100) };
 
-  // Third Place
+  // Third Place + Final — only when both SF results are in
+  if (!sfComplete) return bracket;
   bracket[103] = { home: getLoser(101), away: getLoser(102) };
-
-  // Final
   bracket[104] = { home: getWinner(101), away: getWinner(102) };
 
   return bracket;
