@@ -417,14 +417,8 @@ async function sbSignUp(email, password) {
     return { data: null, error: { message: 'That email is already registered. Please sign in instead.' } };
   }
   if (r.error) return { data: null, error: r.error };
-  // Supabase returns access_token at top level, user nested at r.data.user
-  if (r.data?.access_token) {
-    _currentSession = r.data;
-    localStorage.setItem('sb_session', JSON.stringify(r.data));
-    _authCallbacks.forEach(cb => cb('SIGNED_IN', r.data));
-  }
-  const userId = r.data?.user?.id;
-  return { data: { user: r.data?.user, id: userId }, error: null };
+  // Return the raw response — doRegister will handle session + profile
+  return { data: r.data, error: null };
 }
 
 async function sbSignOut() {
@@ -745,16 +739,18 @@ async function doRegister() {
   btn.disabled = true; btn.textContent = 'Creating…';
   const { data, error } = await sb.auth.signUp({ email, password: pass });
   btn.disabled = false; btn.textContent = 'Create Account →';
-  console.log('REGISTER data:', JSON.stringify(data), 'error:', JSON.stringify(error));
   if (error) { showErr(errEl, error.message || JSON.stringify(error)); return; }
 
-  // Get user ID from response
-  const userId = data?.user?.id || data?.id;
-  console.log('Profile insert userId:', userId);
-  if (!userId) { showErr(errEl, 'Account created but could not get user ID — please sign in manually.'); return; }
+  // Raw Supabase signup response: { access_token, user: { id, ... }, ... }
+  const accessToken = data?.access_token;
+  const userId = data?.user?.id;
 
-  // Use the access token from signup to insert profile
-  const accessToken = data?.access_token || SUPABASE_KEY;
+  if (!userId || !accessToken) {
+    showErr(errEl, 'Signup failed — please try again');
+    return;
+  }
+
+  // Insert profile using the user's own access token
   const profRes = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles`, {
     method: 'POST',
     headers: {
@@ -765,18 +761,11 @@ async function doRegister() {
     },
     body: JSON.stringify({ id: userId, display_name: name, is_admin: false })
   });
-  console.log('Profile insert status:', profRes.status);
-  if (!profRes.ok) {
-    const errText = await profRes.text();
-    console.log('Profile insert error:', errText);
-  }
 
-  // Session is already set from signup — trigger auth state
-  if (data?.access_token) {
-    _currentSession = data;
-    localStorage.setItem('sb_session', JSON.stringify(data));
-    _authCallbacks.forEach(cb => cb('SIGNED_IN', data));
-  }
+  // Set session and trigger login
+  _currentSession = data;
+  localStorage.setItem('sb_session', JSON.stringify(data));
+  _authCallbacks.forEach(cb => cb('SIGNED_IN', data));
   closeModal();
   showToast(`Welcome, ${name}! 🎉`, 'success');
 }
