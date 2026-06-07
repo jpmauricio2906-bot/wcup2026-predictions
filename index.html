@@ -172,6 +172,36 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .toast.success{border-color:var(--correct-border);}
 .toast.error{border-color:var(--wrong-border);}
 
+/* GROUP TABLES */
+.groups-view-toggle{display:flex;gap:0;margin:20px 0 24px;border:1px solid var(--card-border);border-radius:10px;overflow:hidden;max-width:400px;}
+.gvt-btn{flex:1;padding:10px 16px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .2s;}
+.gvt-btn.active{background:var(--accent);color:#0a0e1a;}
+.groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:20px;}
+.group-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);overflow:hidden;}
+.group-card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--input-bg);border-bottom:1px solid var(--card-border);}
+.group-card-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:var(--accent);}
+.group-card-sub{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
+.group-table{width:100%;border-collapse:collapse;}
+.group-table th{font-size:10px;font-weight:700;color:var(--text-subtle);text-transform:uppercase;letter-spacing:1px;padding:7px 10px;text-align:center;border-bottom:1px solid var(--card-border);}
+.group-table th:first-child,.group-table th:nth-child(2){text-align:left;}
+.group-table td{padding:9px 10px;font-size:13px;text-align:center;border-bottom:1px solid var(--card-border);}
+.group-table td:first-child{text-align:left;width:28px;font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--text-subtle);}
+.group-table td:nth-child(2){text-align:left;}
+.group-table tr:last-child td{border-bottom:none;}
+.group-table tr.qualified td{background:rgba(46,204,113,0.06);}
+.group-table tr.qualified td:first-child{color:var(--correct-border);}
+.group-table tr.third td{background:rgba(232,197,58,0.04);}
+.group-team{display:flex;align-items:center;gap:8px;}
+.group-flag{font-size:18px;line-height:1;}
+.group-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
+.pts-cell{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--page-text);font-weight:700;}
+.gd-pos{color:var(--correct-border);}.gd-neg{color:var(--wrong-border);}.gd-zero{color:var(--text-muted);}
+.qualified-bar{height:2px;background:var(--correct-border);margin:0 16px 0;}
+.third-bar{height:2px;background:var(--accent);margin:0 16px 12px;}
+.groups-empty{text-align:center;padding:60px 20px;color:var(--text-muted);}
+.groups-empty-icon{font-size:48px;margin-bottom:16px;}
+.view-note{font-size:12px;color:var(--text-subtle);margin-bottom:20px;padding:10px 14px;background:var(--input-bg);border-radius:8px;border-left:3px solid var(--accent);}
+
 .loading{text-align:center;padding:60px;color:var(--text-muted);}
 .spinner{width:32px;height:32px;border:3px solid var(--card-border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -208,6 +238,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 <div class="topbar">
   <div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" onclick="showSection('predictions',this)">⚽ Predictions</button>
+    <button class="nav-tab" onclick="showSection('groups',this)">🌍 Groups</button>
     <button class="nav-tab" onclick="showSection('leaderboard',this)">🏆 Leaderboard</button>
     <button class="nav-tab" onclick="showSection('stats',this)">📊 Stats</button>
   </div>
@@ -244,6 +275,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 
 <!-- MAIN -->
 <div class="main">
+  <div class="section" id="section-groups">
+    <div id="groupsContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
+  </div>
   <div class="section active" id="section-predictions">
     <div class="phase-filter" id="phaseFilter"></div>
     <div id="matchesContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
@@ -612,6 +646,7 @@ function showSection(name, btn) {
   if(btn) btn.classList.add('active');
   if(name==='leaderboard') renderLeaderboard();
   if(name==='stats') renderStats();
+  if(name==='groups') renderGroups('real');
 }
 
 // ===== SCORING =====
@@ -973,6 +1008,132 @@ async function init() {
   renderMatches();
 }
 init();
+
+
+// =====================================================
+// GROUPS TAB
+// =====================================================
+let _groupsView = 'real'; // 'real' or 'predicted'
+
+function renderGroups(view) {
+  _groupsView = view;
+  const container = document.getElementById('groupsContainer');
+  if (!container) return;
+
+  const groups = 'ABCDEFGHIJKL'.split('');
+
+  // Build standings for each group
+  const allStandings = {};
+  for (const grp of groups) {
+    allStandings[grp] = computeGroupStandingsForView(grp, view);
+  }
+
+  const hasAnyData = groups.some(g => allStandings[g].some(t => t.played > 0));
+
+  const toggleHtml = `
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px">🌍 Group Standings</div>
+        <div style="font-size:13px;color:var(--text-muted)">🟢 Qualified · 🟡 Best 3rd place contender · Eliminated</div>
+      </div>
+      <div class="groups-view-toggle">
+        <button class="gvt-btn${view==='real'?' active':''}" onclick="renderGroups('real')">📊 Real Results</button>
+        <button class="gvt-btn${view==='predicted'?' active':''}" onclick="renderGroups('predicted')">🔮 My Predictions</button>
+      </div>
+    </div>
+    <div class="view-note">
+      ${view==='real'
+        ? '📊 <strong>Real Results</strong> — standings based on actual match results entered by the admin.'
+        : '🔮 <strong>My Predictions</strong> — standings based on your predicted scores. Sign in to see your view.'}
+    </div>`;
+
+  if (!hasAnyData) {
+    container.innerHTML = toggleHtml + `
+      <div class="groups-empty">
+        <div class="groups-empty-icon">${view==='real'?'⏳':'🔮'}</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">${view==='real'?'No results yet':'No predictions yet'}</div>
+        <div style="font-size:13px">${view==='real'
+          ? 'The Admin will enter results as matches are played — check back after June 11.'
+          : 'Go to the Predictions tab and enter your scores to see your projected standings here.'}</div>
+      </div>`;
+    return;
+  }
+
+  const groupsHtml = `<div class="groups-grid">${groups.map(grp => renderGroupCard(grp, allStandings[grp])).join('')}</div>`;
+  container.innerHTML = toggleHtml + groupsHtml;
+}
+
+function computeGroupStandingsForView(group, view) {
+  const teams = GROUP_TEAMS[group];
+  const matchIds = GROUP_MATCHES[group];
+  const stats = {};
+  for (const t of teams) stats[t] = {pts:0,gf:0,ga:0,gd:0,w:0,d:0,l:0,played:0,teamId:t};
+
+  const source = view === 'real' ? matchResults : myPredictions;
+
+  for (const mid of matchIds) {
+    const r = source[mid];
+    const mt = GROUP_MATCH_TEAMS[mid];
+    if (!r || !mt) continue;
+    const {h, a} = mt;
+    const hs = view === 'real' ? r.home : r.home;
+    const as_ = view === 'real' ? r.away : r.away;
+    if (hs === undefined || as_ === undefined) continue;
+    stats[h].gf += hs; stats[h].ga += as_; stats[h].gd += hs-as_; stats[h].played++;
+    stats[a].gf += as_; stats[a].ga += hs; stats[a].gd += as_-hs; stats[a].played++;
+    if (hs > as_)       { stats[h].pts+=3; stats[h].w++; stats[a].l++; }
+    else if (hs === as_){ stats[h].pts+=1; stats[h].d++; stats[a].pts+=1; stats[a].d++; }
+    else                { stats[a].pts+=3; stats[a].w++; stats[h].l++; }
+  }
+
+  return Object.values(stats).sort((a,b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.gd  !== a.gd)  return b.gd  - a.gd;
+    if (b.gf  !== a.gf)  return b.gf  - a.gf;
+    return (FIFA_RANK[a.teamId]||99) - (FIFA_RANK[b.teamId]||99);
+  });
+}
+
+function renderGroupCard(group, standings) {
+  const hasData = standings.some(t => t.played > 0);
+  const gdClass = gd => gd > 0 ? 'gd-pos' : gd < 0 ? 'gd-neg' : 'gd-zero';
+  const gdStr = gd => gd > 0 ? `+${gd}` : `${gd}`;
+
+  const rows = standings.map((t, i) => {
+    const rowClass = i < 2 ? 'qualified' : i === 2 ? 'third' : '';
+    const flag = FLAGS[t.teamId] || '🏳️';
+    const name = TEAMS[t.teamId] || '?';
+    const pos = i === 0 ? '1' : i === 1 ? '2' : i === 2 ? '3' : '4';
+    return `<tr class="${rowClass}">
+      <td>${pos}</td>
+      <td><div class="group-team"><span class="group-flag">${flag}</span><span class="group-name">${name}</span></div></td>
+      <td>${t.played}</td>
+      <td>${t.w}</td>
+      <td>${t.d}</td>
+      <td>${t.l}</td>
+      <td>${t.gf}</td>
+      <td>${t.ga}</td>
+      <td class="${gdClass(t.gd)}">${hasData ? gdStr(t.gd) : '—'}</td>
+      <td><span class="pts-cell">${t.pts}</span></td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="group-card">
+    <div class="group-card-header">
+      <div class="group-card-title">Group ${group}</div>
+      <div class="group-card-sub">${standings.filter(t=>t.played>0).length > 0 ? standings.map(t=>t.played).reduce((a,b)=>a+b,0)/2 + '/6 matches played' : 'No results yet'}</div>
+    </div>
+    <table class="group-table">
+      <thead><tr>
+        <th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>PTS</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="qualified-bar"></div>
+    <div class="third-bar"></div>
+  </div>`;
+}
+
 
 // =====================================================
 // BRACKET ENGINE — Option C: Auto Tournament Progression
