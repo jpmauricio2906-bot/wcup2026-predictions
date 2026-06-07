@@ -954,8 +954,14 @@ function showToast(msg,type=''){
 // ===== INIT =====
 async function init() {
   setTheme(localStorage.getItem('wcup2026_theme')||'default');
-  matchResults=await loadMatchResults();
-  // Auth state handled by onAuthStateChange listener above
+  // Load match results with a timeout so page never hangs
+  try {
+    const timeout = new Promise((_,reject)=>setTimeout(()=>reject('timeout'),5000));
+    matchResults = await Promise.race([loadMatchResults(), timeout]);
+  } catch(e) {
+    matchResults = {};
+    console.log('Match results load timed out — continuing without them');
+  }
   renderMatches();
 }
 init();
