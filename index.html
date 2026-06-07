@@ -412,21 +412,19 @@ async function sbSignIn(email, password) {
 
 async function sbSignUp(email, password) {
   const r = await sbAuth('signup', { email, password });
-  console.log('SIGNUP RAW RESPONSE:', JSON.stringify(r));
-  // Supabase sometimes returns errors inside data instead of error field
-  if (r.error || r.data?.code) {
-    const errMsg = r.data?.message || r.error?.message || 'Signup failed';
-    if (r.data?.code === '23505') return { data: null, error: { message: 'That email is already registered. Please sign in instead.' } };
-    return { data: null, error: { message: errMsg } };
+  // Handle duplicate email
+  if (r.data?.code === '23505') {
+    return { data: null, error: { message: 'That email is already registered. Please sign in instead.' } };
   }
-  const user = r.data;
-  const session = user?.session || null;
-  if (session?.access_token) {
-    _currentSession = session;
-    localStorage.setItem('sb_session', JSON.stringify(session));
-    _authCallbacks.forEach(cb => cb('SIGNED_IN', session));
+  if (r.error) return { data: null, error: r.error };
+  // Supabase returns access_token at top level, user nested at r.data.user
+  if (r.data?.access_token) {
+    _currentSession = r.data;
+    localStorage.setItem('sb_session', JSON.stringify(r.data));
+    _authCallbacks.forEach(cb => cb('SIGNED_IN', r.data));
   }
-  return { data: { user: user, id: user?.id }, error: null };
+  const userId = r.data?.user?.id;
+  return { data: { user: r.data?.user, id: userId }, error: null };
 }
 
 async function sbSignOut() {
@@ -752,24 +750,33 @@ async function doRegister() {
 
   // Get user ID from response
   const userId = data?.user?.id || data?.id;
-  if (!userId) { showErr(errEl, 'Account created but could not get user ID — please sign in'); return; }
+  console.log('Profile insert userId:', userId);
+  if (!userId) { showErr(errEl, 'Account created but could not get user ID — please sign in manually.'); return; }
 
-  // Create profile row
+  // Use the access token from signup to insert profile
+  const accessToken = data?.access_token || SUPABASE_KEY;
   const profRes = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles`, {
     method: 'POST',
     headers: {
       'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=minimal'
     },
     body: JSON.stringify({ id: userId, display_name: name, is_admin: false })
   });
   console.log('Profile insert status:', profRes.status);
+  if (!profRes.ok) {
+    const errText = await profRes.text();
+    console.log('Profile insert error:', errText);
+  }
 
-  // Now sign in automatically
-  const { error: loginErr } = await sb.auth.signInWithPassword({ email, password: pass });
-  if (loginErr) { showErr(errEl, 'Account created! Please sign in manually.'); return; }
+  // Session is already set from signup — trigger auth state
+  if (data?.access_token) {
+    _currentSession = data;
+    localStorage.setItem('sb_session', JSON.stringify(data));
+    _authCallbacks.forEach(cb => cb('SIGNED_IN', data));
+  }
   closeModal();
   showToast(`Welcome, ${name}! 🎉`, 'success');
 }
