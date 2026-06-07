@@ -413,12 +413,16 @@ async function sbSignIn(email, password) {
 async function sbSignUp(email, password) {
   const r = await sbAuth('signup', { email, password });
   if (r.error) return { data: null, error: r.error };
-  if (r.data?.access_token) {
-    _currentSession = r.data;
-    localStorage.setItem('sb_session', JSON.stringify(r.data));
-    _authCallbacks.forEach(cb => cb('SIGNED_IN', r.data));
+  // Supabase returns user data directly at r.data
+  const user = r.data;
+  const session = user?.session || null;
+  if (session?.access_token) {
+    _currentSession = session;
+    localStorage.setItem('sb_session', JSON.stringify(session));
+    _authCallbacks.forEach(cb => cb('SIGNED_IN', session));
   }
-  return { data: r.data, error: null };
+  // Return in SDK format: { data: { user } }
+  return { data: { user: user, id: user?.id }, error: null };
 }
 
 async function sbSignOut() {
@@ -737,19 +741,17 @@ async function doRegister() {
   if (existing && existing.length > 0) { showErr(errEl, 'That display name is already taken'); return; }
 
   btn.disabled = true; btn.textContent = 'Creating…';
-  const { data, error } = await sb.auth.signUp({
-    email, password: pass,
-    options: { data: { display_name: name } }
-  });
+  const { data, error } = await sb.auth.signUp({ email, password: pass });
   btn.disabled = false; btn.textContent = 'Create Account →';
-  if (error) { showErr(errEl, error.message); return; }
+  if (error) { showErr(errEl, error.message || JSON.stringify(error)); return; }
 
-  // Create profile row
-  if (data.user) {
-    await sb.from('player_profiles').insert({ id: data.user.id, display_name: name, is_admin: false });
+  // Raw auth response has user id at data.id (not data.user.id)
+  const userId = data?.user?.id || data?.id;
+  if (userId) {
+    await sb.from('player_profiles').insert({ id: userId, display_name: name, is_admin: false });
   }
   closeModal();
-  showToast(`Welcome, ${name}! 🎉 Check your email to confirm your account.`, 'success');
+  showToast(`Welcome, ${name}! 🎉`, 'success');
 }
 
 async function doForgotPassword() {
