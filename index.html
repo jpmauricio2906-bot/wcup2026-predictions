@@ -6,26 +6,36 @@
 <title>FIFA World Cup 2026 — Predictions</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Supabase JS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --page-bg:#0a0e1a;--page-text:#e8eaf0;--card-bg:#111828;--card-border:#1e2838;
   --hero-bg:linear-gradient(135deg,#0f1b35 0%,#0a0e1a 100%);
   --accent:#e8c53a;--accent-light:#f0d86e;--accent-bg:#1a1500;
-  --input-bg:#0d1420;--input-border:#2a3a5a;--text-muted:#7a8298;--text-subtle:#4a5068;
-  --correct-bg:#0d2214;--correct-border:#2ecc71;--wrong-bg:#200d0d;--wrong-border:#e74c3c;
-  --pill-bg:#1e2838;--pill-text:#e8c53a;--shadow:0 4px 24px rgba(0,0,0,0.5);--br:12px;
+  --input-bg:#0d1420;--input-border:#2a3a5a;
+  --text-muted:#7a8298;--text-subtle:#4a5068;
+  --correct-bg:#0d2214;--correct-border:#2ecc71;
+  --wrong-bg:#200d0d;--wrong-border:#e74c3c;
+  --pill-bg:#1e2838;--pill-text:#e8c53a;
+  --shadow:0 4px 24px rgba(0,0,0,0.5);--br:12px;
 }
 [data-theme="arctic"]{--page-bg:#f0f4f8;--page-text:#0a1020;--card-bg:#fff;--card-border:#dde3ec;--hero-bg:linear-gradient(135deg,#e8f0fe,#fff);--accent:#c8960a;--accent-light:#e5b020;--accent-bg:#fff9e0;--input-bg:#f7f9fc;--input-border:#c8d0dc;--text-muted:#64748b;--text-subtle:#94a3b8;--correct-bg:#f0fdf4;--correct-border:#16a34a;--wrong-bg:#fef2f2;--wrong-border:#dc2626;--pill-bg:#fef9e0;--pill-text:#9a7000;}
 [data-theme="sunset"]{--page-bg:#1a0e0a;--page-text:#f0e6e0;--card-bg:#231510;--card-border:#3a2218;--hero-bg:linear-gradient(135deg,#2a1008,#231510);--accent:#ff6b35;--accent-light:#ff8c5a;--accent-bg:#2a1008;--input-bg:#2e1a12;--input-border:#4a2e20;--text-muted:#9e7060;--text-subtle:#6a4030;--correct-bg:#0a200a;--correct-border:#4caf50;--wrong-bg:#2a0a0a;--wrong-border:#ef5350;--pill-bg:#3a2218;--pill-text:#ff8c5a;}
 [data-theme="forest"]{--page-bg:#0f1a0f;--page-text:#d4e8d4;--card-bg:#142014;--card-border:#1e3a1e;--hero-bg:linear-gradient(135deg,#0a1f0a,#142014);--accent:#4caf50;--accent-light:#81c784;--accent-bg:#0a2a0a;--input-bg:#1a2e1a;--input-border:#2a4a2a;--text-muted:#7a9e7a;--text-subtle:#4a6a4a;--correct-bg:#0a2a0a;--correct-border:#4caf50;--wrong-bg:#2a0a0a;--wrong-border:#ef5350;--pill-bg:#1e3a1e;--pill-text:#81c784;}
+
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page-text);min-height:100vh;transition:background .3s,color .3s;}
+
+/* HERO */
 .hero{background:var(--hero-bg);padding:48px 24px 32px;text-align:center;border-bottom:2px solid var(--card-border);position:relative;overflow:hidden;}
 .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(232,197,58,.08),transparent 70%);pointer-events:none;}
 .hero-badge{display:inline-block;background:var(--accent);color:#0a0e1a;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:16px;}
 .hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,8vw,96px);letter-spacing:2px;line-height:.9;}
 .hero h1 span{color:var(--accent);}
 .hero-sub{margin-top:12px;font-size:14px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
+
+/* TOPBAR */
 .topbar{background:var(--card-bg);border-bottom:1px solid var(--card-border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100;}
 .nav-tabs{display:flex;gap:4px;}
 .nav-tab{padding:8px 16px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .2s;}
@@ -37,54 +47,61 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .theme-btn:hover{transform:scale(1.15);}
 .theme-btn.active{border-color:var(--accent);}
 
-/* Auth bar */
+/* AUTH BAR */
 .auth-bar{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);padding:14px 20px;margin:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.auth-info{display:flex;align-items:center;gap:10px;flex:1;}
-.auth-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-bg);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--accent);font-family:'Bebas Neue',sans-serif;}
+.auth-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-bg);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--accent);font-family:'Bebas Neue',sans-serif;flex-shrink:0;}
 .auth-name{font-weight:600;font-size:14px;}
 .auth-role{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
-.btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .2s;}
+
+/* BUTTONS */
+.btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .2s;white-space:nowrap;}
 .btn-primary{background:var(--accent);color:#0a0e1a;}
 .btn-primary:hover{background:var(--accent-light);transform:translateY(-1px);}
 .btn-secondary{background:transparent;color:var(--text-muted);border:1px solid var(--card-border);}
 .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
 .btn-danger{background:#e74c3c;color:#fff;}
 .btn-danger:hover{background:#c0392b;}
-.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;}
+.btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);padding:6px 12px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;}
 
-/* Modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;}
-.modal{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:32px;max-width:440px;width:100%;animation:fadeIn .2s ease;}
+/* MODALS */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+.modal{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:32px;max-width:440px;width:100%;animation:fadeIn .2s ease;max-height:90vh;overflow-y:auto;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .modal h2{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);margin-bottom:6px;}
-.modal p{font-size:13px;color:var(--text-muted);margin-bottom:20px;}
+.modal-sub{font-size:13px;color:var(--text-muted);margin-bottom:22px;}
 .form-group{margin-bottom:14px;}
 .form-label{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;}
 .form-input{width:100%;background:var(--input-bg);border:1px solid var(--input-border);color:var(--page-text);border-radius:8px;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s;}
 .form-input:focus{border-color:var(--accent);}
-.form-error{font-size:12px;color:var(--wrong-border);margin-top:6px;}
-.divider{border:none;border-top:1px solid var(--card-border);margin:20px 0;}
-.player-list{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;}
-.player-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:8px;border:1px solid var(--card-border);cursor:pointer;transition:all .2s;}
-.player-item:hover{border-color:var(--accent);background:var(--accent-bg);}
-.player-item-name{font-weight:600;font-size:14px;}
-.player-item-info{font-size:11px;color:var(--text-muted);}
+.form-hint{font-size:11px;color:var(--text-subtle);margin-top:4px;}
+.form-error{font-size:12px;color:var(--wrong-border);margin-top:6px;padding:8px 12px;background:var(--wrong-bg);border-radius:6px;display:none;}
+.form-success{font-size:12px;color:var(--correct-border);margin-top:6px;padding:8px 12px;background:var(--correct-bg);border-radius:6px;display:none;}
+.divider{border:none;border-top:1px solid var(--card-border);margin:18px 0;}
+.modal-link{color:var(--accent);text-decoration:none;font-size:13px;cursor:pointer;}
+.modal-link:hover{text-decoration:underline;}
+.tab-bar{display:flex;gap:0;margin-bottom:22px;border:1px solid var(--card-border);border-radius:8px;overflow:hidden;}
+.tab-bar-btn{flex:1;padding:9px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .2s;}
+.tab-bar-btn.active{background:var(--accent);color:#0a0e1a;}
 
-/* Main */
+/* MAIN CONTENT */
 .main{max-width:960px;margin:0 auto;padding:0 16px 60px;}
 .section{display:none;}
 .section.active{display:block;}
+
+/* PHASE FILTER */
 .phase-filter{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 16px;}
 .phase-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--card-border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;}
 .phase-btn.active,.phase-btn:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);}
+
+/* MATCH CARDS */
 .phase-section{margin-bottom:32px;}
 .phase-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
 .phase-title::after{content:'';flex:1;height:1px;background:var(--card-border);}
 .match-grid{display:grid;gap:10px;}
-.match-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);padding:14px 16px;transition:border-color .2s,box-shadow .2s;position:relative;}
-.match-card:hover{box-shadow:var(--shadow);}
+.match-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);padding:14px 16px;transition:all .2s;position:relative;}
 .match-card.has-prediction{border-left:3px solid var(--accent);}
-.match-card.result-entered{border-left:3px solid var(--correct-border);}
+.match-card.has-result{border-left:3px solid var(--correct-border);}
 .match-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
 .match-date{font-size:11px;color:var(--text-muted);}
 .group-badge{font-size:10px;font-weight:700;letter-spacing:1px;background:var(--pill-bg);color:var(--pill-text);padding:2px 8px;border-radius:10px;}
@@ -95,30 +112,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .team-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;}
 .team-side.away .team-name{text-align:right;}
 .score-area{display:flex;align-items:center;gap:6px;}
-.score-input{width:44px;height:40px;background:var(--input-bg);border:1px solid var(--input-border);color:var(--page-text);border-radius:8px;text-align:center;font-size:18px;font-weight:700;font-family:'Bebas Neue',sans-serif;outline:none;transition:border-color .2s;-moz-appearance:textfield;}
+.score-input{width:44px;height:40px;background:var(--input-bg);border:1px solid var(--input-border);color:var(--page-text);border-radius:8px;text-align:center;font-size:18px;font-weight:700;font-family:'Bebas Neue',sans-serif;outline:none;transition:all .2s;-moz-appearance:textfield;}
 .score-input::-webkit-inner-spin-button,.score-input::-webkit-outer-spin-button{-webkit-appearance:none;}
-.score-input:focus{border-color:var(--accent);}
+.score-input:focus{border-color:var(--accent);background:var(--accent-bg);}
 .score-input.admin-input{border-color:var(--correct-border);background:var(--correct-bg);}
+.score-input:disabled{opacity:.6;cursor:not-allowed;}
 .score-sep{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--text-muted);}
-.save-indicator{position:absolute;top:10px;right:12px;font-size:10px;color:var(--text-subtle);display:flex;align-items:center;gap:4px;}
-.saved-dot{width:6px;height:6px;border-radius:50%;background:var(--correct-border);}
-.saving-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse .8s infinite;}
+.save-ind{position:absolute;top:10px;right:12px;font-size:10px;color:var(--text-subtle);display:flex;align-items:center;gap:4px;}
+.dot-saved{width:6px;height:6px;border-radius:50%;background:var(--correct-border);}
+.dot-saving{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse .8s infinite;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.pts-badge{position:absolute;bottom:10px;right:12px;font-family:'Bebas Neue',sans-serif;font-size:14px;padding:2px 8px;border-radius:6px;}
+.pts-3{background:var(--correct-bg);color:var(--correct-border);}
+.pts-2{background:#0d1a0d;color:#7dbe7d;}
+.pts-1{background:#0a1020;color:#4f8ef7;}
+.pts-0{background:var(--wrong-bg);color:var(--wrong-border);}
+.actual-result{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.actual-score{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--correct-border);}
+.actual-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
 .match-label{text-align:center;font-size:12px;color:var(--text-muted);margin-bottom:8px;font-style:italic;}
 
-/* Points badge */
-.points-badge{position:absolute;bottom:10px;right:12px;font-family:'Bebas Neue',sans-serif;font-size:15px;padding:2px 8px;border-radius:6px;}
-.points-3{background:var(--correct-bg);color:var(--correct-border);}
-.points-2{background:#0d1a0d;color:#7dbe7d;}
-.points-1{background:#0a1020;color:#4f8ef7;}
-.points-0{background:var(--wrong-bg);color:var(--wrong-border);}
-
-/* Result display on cards */
-.actual-result{display:flex;align-items:center;gap:6px;justify-content:center;}
-.actual-score{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--correct-border);}
-.actual-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
-
-/* Leaderboard */
+/* LEADERBOARD */
 .lb-table{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);overflow:hidden;}
 .lb-row{display:grid;grid-template-columns:52px 1fr 70px 70px 70px 70px;padding:13px 20px;align-items:center;border-bottom:1px solid var(--card-border);transition:background .15s;}
 .lb-row:last-child{border-bottom:none;}
@@ -132,199 +146,223 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .lb-exact{font-size:13px;color:var(--correct-border);text-align:center;}
 .lb-me{background:var(--accent-bg)!important;}
 
-/* Stats */
+/* STATS */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
 .stat-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);padding:20px;text-align:center;}
-.stat-number{font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--accent);line-height:1;}
-.stat-label{font-size:12px;color:var(--text-muted);margin-top:6px;text-transform:uppercase;letter-spacing:1px;}
+.stat-num{font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--accent);line-height:1;}
+.stat-lbl{font-size:12px;color:var(--text-muted);margin-top:6px;text-transform:uppercase;letter-spacing:1px;}
 
-/* Admin panel */
-.admin-section{margin-bottom:32px;}
-.admin-title{font-family:'Bebas Neue',sans-serif;font-size:22px;color:#e74c3c;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-.admin-title::after{content:'';flex:1;height:1px;background:#2d0d0d;}
+/* ADMIN */
 .admin-match-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);padding:14px 16px;margin-bottom:8px;}
 .admin-match-card.has-result{border-left:3px solid var(--correct-border);}
-.admin-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.admin-title{font-family:'Bebas Neue',sans-serif;font-size:22px;color:#e74c3c;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.admin-title::after{content:'';flex:1;height:1px;background:#2d0d0d;}
 .players-mgmt{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);overflow:hidden;}
-.player-mgmt-row{display:grid;grid-template-columns:1fr 100px 80px;padding:12px 16px;align-items:center;border-bottom:1px solid var(--card-border);}
-.player-mgmt-row:last-child{border-bottom:none;}
-.player-mgmt-row.header{background:var(--input-bg);font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
+.pmgmt-row{display:grid;grid-template-columns:1fr 140px 80px;padding:12px 16px;align-items:center;border-bottom:1px solid var(--card-border);}
+.pmgmt-row:last-child{border-bottom:none;}
+.pmgmt-row.header{background:var(--input-bg);font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
 
-/* Progress */
-.progress-bar{height:4px;background:var(--card-border);border-radius:2px;margin:16px 0 8px;overflow:hidden;}
-.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .5s ease;}
+/* PROGRESS */
+.progress-bar{height:4px;background:var(--card-border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .5s;}
 
-/* Toast */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--card-bg);border:1px solid var(--card-border);color:var(--page-text);padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;box-shadow:var(--shadow);transform:translateX(120%);transition:transform .3s ease;}
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card-bg);border:1px solid var(--card-border);color:var(--page-text);padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;box-shadow:var(--shadow);transform:translateX(120%);transition:transform .3s;}
 .toast.show{transform:translateX(0);}
 .toast.success{border-color:var(--correct-border);}
 .toast.error{border-color:var(--wrong-border);}
-.loading{text-align:center;padding:60px;color:var(--text-muted);font-size:14px;}
+
+.loading{text-align:center;padding:60px;color:var(--text-muted);}
 .spinner{width:32px;height:32px;border:3px solid var(--card-border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* LOCKED STATE */
+.locked-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+.locked-icon{font-size:52px;margin-bottom:16px;}
+.locked-title{font-size:18px;font-weight:700;color:var(--page-text);margin-bottom:8px;}
+.locked-sub{font-size:13px;margin-bottom:24px;}
+
 @media(max-width:600px){
   .hero{padding:32px 16px 24px;}
   .topbar{padding:10px 12px;}
-  .auth-bar{margin:12px;}
+  .auth-bar{margin:10px 12px;}
   .match-teams{grid-template-columns:1fr 90px 1fr;}
   .team-name{font-size:12px;max-width:90px;}
   .score-input{width:38px;height:36px;font-size:16px;}
   .lb-row{grid-template-columns:40px 1fr 60px 60px;}
   .lb-stat,.lb-exact{display:none;}
+  .pmgmt-row{grid-template-columns:1fr 80px;}
 }
 </style>
 </head>
 <body>
 
+<!-- HERO -->
 <div class="hero">
-  <div class="hero-badge">Official Predictions v2</div>
+  <div class="hero-badge">Official Predictions v3</div>
   <h1>FIFA WORLD<br><span>CUP 2026</span></h1>
   <div class="hero-sub">USA · Canada · Mexico · June 11 — July 26</div>
 </div>
 
+<!-- TOPBAR -->
 <div class="topbar">
   <div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" onclick="showSection('predictions',this)">⚽ Predictions</button>
     <button class="nav-tab" onclick="showSection('leaderboard',this)">🏆 Leaderboard</button>
     <button class="nav-tab" onclick="showSection('stats',this)">📊 Stats</button>
   </div>
-  <div style="display:flex;align-items:center;gap:12px">
+  <div style="display:flex;align-items:center;gap:10px">
     <div class="theme-switcher">
-      <button class="theme-btn active" data-theme="default" onclick="setTheme('default')">🌙</button>
-      <button class="theme-btn" data-theme="arctic" onclick="setTheme('arctic')">❄️</button>
-      <button class="theme-btn" data-theme="sunset" onclick="setTheme('sunset')">🌅</button>
-      <button class="theme-btn" data-theme="forest" onclick="setTheme('forest')">🌿</button>
+      <button class="theme-btn active" data-theme="default" onclick="setTheme('default')" title="Midnight">🌙</button>
+      <button class="theme-btn" data-theme="arctic" onclick="setTheme('arctic')" title="Arctic">❄️</button>
+      <button class="theme-btn" data-theme="sunset" onclick="setTheme('sunset')" title="Sunset">🌅</button>
+      <button class="theme-btn" data-theme="forest" onclick="setTheme('forest')" title="Forest">🌿</button>
     </div>
   </div>
 </div>
 
-<!-- Auth bar -->
+<!-- AUTH BAR -->
 <div class="auth-bar" id="authBar">
-  <div id="authLoggedOut" style="display:flex;align-items:center;gap:12px;flex:1;flex-wrap:wrap">
+  <div id="authOut" style="display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap">
     <span style="font-size:13px;color:var(--text-muted)">Not signed in</span>
-    <button class="btn btn-primary" onclick="showLoginModal()">Sign In</button>
-    <button class="btn btn-secondary" onclick="showRegisterModal()">Register</button>
+    <button class="btn btn-primary" onclick="openAuth('login')">Sign In</button>
+    <button class="btn btn-secondary" onclick="openAuth('register')">Register</button>
   </div>
-  <div id="authLoggedIn" style="display:none;align-items:center;gap:12px;flex:1;flex-wrap:wrap">
-    <div class="auth-info">
+  <div id="authIn" style="display:none;align-items:center;gap:12px;flex:1;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;flex:1">
       <div class="auth-avatar" id="authAvatar">?</div>
       <div>
-        <div class="auth-name" id="authName">—</div>
+        <div class="auth-name" id="authDisplayName">—</div>
         <div class="auth-role" id="authRole">Player</div>
       </div>
     </div>
     <span id="authPredCount" style="font-size:12px;color:var(--text-muted)"></span>
-    <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
+    <button class="btn btn-ghost" onclick="openAuth('password')">Change Password</button>
+    <button class="btn btn-secondary" onclick="doSignOut()">Sign Out</button>
   </div>
 </div>
 
 <!-- MAIN -->
 <div class="main">
-
-  <!-- PREDICTIONS -->
   <div class="section active" id="section-predictions">
     <div class="phase-filter" id="phaseFilter"></div>
-    <div id="matchesContainer"><div class="loading"><div class="spinner"></div>Loading matches…</div></div>
+    <div id="matchesContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
   </div>
-
-  <!-- LEADERBOARD -->
   <div class="section" id="section-leaderboard">
     <div id="leaderboardContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
   </div>
-
-  <!-- STATS -->
   <div class="section" id="section-stats">
     <div id="statsContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
   </div>
-
-  <!-- ADMIN -->
   <div class="section" id="section-admin">
     <div id="adminContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
   </div>
-
 </div>
 
-<!-- LOGIN MODAL -->
-<div class="modal-overlay" id="loginModal" style="display:none">
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal" style="display:none">
   <div class="modal">
-    <h2>Sign In</h2>
-    <p>Enter your name and password to access your predictions.</p>
-    <div class="form-group">
-      <label class="form-label">Name</label>
-      <input class="form-input" id="loginName" placeholder="Your name…" autocomplete="username">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Password</label>
-      <input class="form-input" type="password" id="loginPass" placeholder="Password…" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter')doLogin()">
-      <div class="form-error" id="loginError" style="display:none"></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:6px">
-      <button class="btn btn-primary" onclick="doLogin()" style="flex:1" id="loginBtn">Sign In →</button>
-      <button class="btn btn-secondary" onclick="closeModal('loginModal')">Cancel</button>
-    </div>
-    <hr class="divider">
-    <div style="font-size:13px;color:var(--text-muted);text-align:center">
-      No account? <a href="#" onclick="closeModal('loginModal');showRegisterModal()" style="color:var(--accent)">Register here</a>
+    <!-- Tab bar -->
+    <div class="tab-bar" id="authTabBar">
+      <button class="tab-bar-btn active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+      <button class="tab-bar-btn" id="tabRegister" onclick="switchTab('register')">Register</button>
     </div>
 
-    <hr class="divider">
-    <div style="font-size:12px;color:var(--text-subtle);margin-bottom:8px">Or sign in as an existing player:</div>
-    <div class="player-list" id="playerList"></div>
+    <!-- LOGIN -->
+    <div id="panelLogin">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="loginEmail" type="email" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="loginPass" type="password" placeholder="Password…" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="form-error" id="loginError"></div>
+      <button class="btn btn-primary" onclick="doLogin()" id="loginBtn" style="width:100%;margin-bottom:12px">Sign In →</button>
+      <div style="text-align:center">
+        <span class="modal-link" onclick="switchTab('forgot')">Forgot password?</span>
+      </div>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="panelRegister" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" id="regName" placeholder="Your name (shown on leaderboard)" maxlength="30">
+        <div class="form-hint">This is how others will see you</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="regEmail" type="email" placeholder="your@email.com">
+        <div class="form-hint">Used for password recovery only — not shown to others</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="regPass" type="password" placeholder="Minimum 6 characters">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm Password</label>
+        <input class="form-input" id="regPass2" type="password" placeholder="Repeat password"
+          onkeydown="if(event.key==='Enter')doRegister()">
+      </div>
+      <div class="form-error" id="regError"></div>
+      <button class="btn btn-primary" onclick="doRegister()" id="regBtn" style="width:100%">Create Account →</button>
+    </div>
+
+    <!-- FORGOT PASSWORD -->
+    <div id="panelForgot" style="display:none">
+      <h2>Reset Password</h2>
+      <p class="modal-sub">Enter your email and we'll send you a reset link.</p>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="forgotEmail" type="email" placeholder="your@email.com"
+          onkeydown="if(event.key==='Enter')doForgotPassword()">
+      </div>
+      <div class="form-error" id="forgotError"></div>
+      <div class="form-success" id="forgotSuccess"></div>
+      <button class="btn btn-primary" onclick="doForgotPassword()" id="forgotBtn" style="width:100%;margin-bottom:12px">Send Reset Link →</button>
+      <div style="text-align:center">
+        <span class="modal-link" onclick="switchTab('login')">← Back to Sign In</span>
+      </div>
+    </div>
+
+    <!-- CHANGE PASSWORD (logged in) -->
+    <div id="panelPassword" style="display:none">
+      <h2>Change Password</h2>
+      <p class="modal-sub">Set a new password for your account.</p>
+      <div class="form-group">
+        <label class="form-label">New Password</label>
+        <input class="form-input" id="newPass" type="password" placeholder="Minimum 6 characters">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm New Password</label>
+        <input class="form-input" id="newPass2" type="password" placeholder="Repeat new password"
+          onkeydown="if(event.key==='Enter')doChangePassword()">
+      </div>
+      <div class="form-error" id="passError"></div>
+      <div class="form-success" id="passSuccess"></div>
+      <button class="btn btn-primary" onclick="doChangePassword()" id="passBtn" style="width:100%">Update Password →</button>
+    </div>
+
+    <div style="text-align:right;margin-top:16px">
+      <span class="modal-link" onclick="closeModal()" style="font-size:12px;color:var(--text-subtle)">Close ✕</span>
+    </div>
   </div>
 </div>
 
-<!-- REGISTER MODAL -->
-<div class="modal-overlay" id="registerModal" style="display:none">
-  <div class="modal">
-    <h2>Register</h2>
-    <p>Create your account to start predicting match scores.</p>
-    <div class="form-group">
-      <label class="form-label">Display Name</label>
-      <input class="form-input" id="regName" placeholder="Your name…" maxlength="30">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Password</label>
-      <input class="form-input" type="password" id="regPass" placeholder="Choose a password…">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Confirm Password</label>
-      <input class="form-input" type="password" id="regPass2" placeholder="Repeat password…"
-        onkeydown="if(event.key==='Enter')doRegister()">
-      <div class="form-error" id="regError" style="display:none"></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:6px">
-      <button class="btn btn-primary" onclick="doRegister()" style="flex:1" id="regBtn">Create Account →</button>
-      <button class="btn btn-secondary" onclick="closeModal('registerModal')">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- ADMIN: Reset Password Modal -->
-<div class="modal-overlay" id="resetModal" style="display:none">
-  <div class="modal">
-    <h2>Reset Password</h2>
-    <p id="resetModalSubtitle">Set a new password for this player.</p>
-    <input type="hidden" id="resetPlayerId">
-    <div class="form-group">
-      <label class="form-label">New Password</label>
-      <input class="form-input" type="password" id="resetNewPass" placeholder="New password…">
-      <div class="form-error" id="resetError" style="display:none"></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:6px">
-      <button class="btn btn-primary" onclick="doResetPassword()" style="flex:1">Set Password →</button>
-      <button class="btn btn-secondary" onclick="closeModal('resetModal')">Cancel</button>
-    </div>
-  </div>
-</div>
-
+<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
 // ===== CONFIG =====
 const SUPABASE_URL = 'https://bbcmrgsxxowjwcmgrilk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_7g8UYr7kQ1d9Lg0vafvC8A_UGGcwLZX';
-const ADMIN_NAME   = 'Admin';   // Change this to your preferred admin username
+
+// Init Supabase client
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ===== MATCH DATA =====
 const TEAMS={1:"France",2:"Spain",3:"Argentina",4:"England",5:"Portugal",6:"Brazil",7:"Netherlands",8:"Morocco",9:"Belgium",10:"Germany",11:"Croatia",12:"Italy",13:"Colombia",14:"Senegal",15:"Mexico",16:"USA",17:"Uruguay",18:"Japan",19:"Switzerland",20:"Denmark",21:"IR Iran",22:"Turkey",23:"Ecuador",24:"Austria",25:"Rep. of Korea",26:"Nigeria",27:"Australia",28:"Algeria",29:"Egypt",30:"Canada",31:"Norway",32:"Ukraine",33:"Panama",34:"Ivory Coast",35:"Poland",36:"Russia",37:"Wales",38:"Sweden",39:"Serbia",40:"Paraguay",41:"Czech Rep.",42:"Hungary",43:"Scotland",44:"Tunisia",45:"Cameroon",46:"DR Congo",47:"Greece",48:"Slovakia",49:"Venezuela",50:"Uzbekistan",51:"Costa Rica",52:"Mali",53:"Peru",54:"Chile",55:"Qatar",56:"Romania",57:"Iraq",58:"Slovenia",60:"South Africa",61:"Saudi Arabia",62:"Burkina Faso",63:"Jordan",64:"Albania",65:"Bosnia/Herzeg.",66:"Honduras",69:"Cape Verde",70:"Northern Ireland",71:"Jamaica",72:"Georgia",73:"Finland",74:"Ghana",75:"Iceland",76:"Bolivia",77:"Israel",79:"Oman",81:"Montenegro",82:"Curaçao",83:"Haiti",85:"New Zealand",86:"Bulgaria"};
@@ -386,218 +424,240 @@ const MATCHES=[
 ];
 
 // ===== STATE =====
-let currentPlayer = null;
-let predictions = {};
+let currentUser = null;       // Supabase auth user
+let currentProfile = null;    // player_profiles row
+let myPredictions = {};
 let matchResults = {};
-let allPlayers = [];
 let saveTimers = {};
 let activePhaseFilter = 'Group Stage';
-const SESSION_KEY = 'wcup2026_session';
 
-// ===== CRYPTO HELPERS =====
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
+// ===== SUPABASE AUTH LISTENERS =====
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    // User clicked reset link in email — open change password panel
+    openAuth('password');
+    showToast('Enter your new password below', '');
+    return;
+  }
+  if (session?.user) {
+    currentUser = session.user;
+    await loadProfile();
+  } else {
+    currentUser = null;
+    currentProfile = null;
+    myPredictions = {};
+  }
+  updateAuthBar();
+  renderMatches();
+});
 
-// ===== SUPABASE =====
-async function sb(endpoint, options={}) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': options.prefer || 'return=representation',
-        ...options.headers
-      },
-      ...options
-    });
-    if (!res.ok) { const t=await res.text(); console.error('SB error',res.status,t); return null; }
-    const text = await res.text();
-    return text ? JSON.parse(text) : [];
-  } catch(e) { console.error('SB fetch error',e); return null; }
-}
-
-// ===== AUTH =====
+// ===== AUTH ACTIONS =====
 async function doLogin() {
-  const name = document.getElementById('loginName').value.trim();
-  const pass = document.getElementById('loginPass').value;
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
   const errEl = document.getElementById('loginError');
-  const btn = document.getElementById('loginBtn');
-  if (!name || !pass) { showErr(errEl,'Please fill in both fields'); return; }
-  btn.disabled = true; btn.textContent = 'Signing in…';
+  const btn   = document.getElementById('loginBtn');
   errEl.style.display = 'none';
-
-  const hash = await sha256(pass);
-  const found = await sb(`players?name=eq.${encodeURIComponent(name)}&password_hash=eq.${hash}&select=id,name,is_admin`);
+  if (!email || !pass) { showErr(errEl, 'Please fill in both fields'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
   btn.disabled = false; btn.textContent = 'Sign In →';
-
-  if (!found || found.length === 0) { showErr(errEl,'Incorrect name or password'); return; }
-  await completeLogin(found[0]);
-  closeModal('loginModal');
+  if (error) { showErr(errEl, error.message); return; }
+  closeModal();
+  showToast('Welcome back! 👋', 'success');
 }
 
 async function doRegister() {
-  const name = document.getElementById('regName').value.trim();
-  const pass = document.getElementById('regPass').value;
+  const name  = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pass  = document.getElementById('regPass').value;
   const pass2 = document.getElementById('regPass2').value;
   const errEl = document.getElementById('regError');
-  const btn = document.getElementById('regBtn');
-  if (!name) { showErr(errEl,'Please enter a name'); return; }
-  if (pass.length < 4) { showErr(errEl,'Password must be at least 4 characters'); return; }
-  if (pass !== pass2) { showErr(errEl,'Passwords do not match'); return; }
-  btn.disabled = true; btn.textContent = 'Creating…';
+  const btn   = document.getElementById('regBtn');
   errEl.style.display = 'none';
+  if (!name)            { showErr(errEl, 'Please enter a display name'); return; }
+  if (!email)           { showErr(errEl, 'Please enter your email'); return; }
+  if (pass.length < 6)  { showErr(errEl, 'Password must be at least 6 characters'); return; }
+  if (pass !== pass2)   { showErr(errEl, 'Passwords do not match'); return; }
 
   // Check name not taken
-  const existing = await sb(`players?name=eq.${encodeURIComponent(name)}&select=id`);
-  if (existing && existing.length > 0) { btn.disabled=false; btn.textContent='Create Account →'; showErr(errEl,'That name is already taken'); return; }
+  const { data: existing } = await sb.from('player_profiles').select('id').eq('display_name', name);
+  if (existing && existing.length > 0) { showErr(errEl, 'That display name is already taken'); return; }
 
-  const hash = await sha256(pass);
-  const created = await sb('players', {
-    method:'POST', prefer:'return=representation',
-    body: JSON.stringify({ name, password_hash: hash, is_admin: false })
+  btn.disabled = true; btn.textContent = 'Creating…';
+  const { data, error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { display_name: name } }
   });
   btn.disabled = false; btn.textContent = 'Create Account →';
-  if (!created || created.length === 0) { showErr(errEl,'Registration failed — please try again'); return; }
-  await completeLogin(created[0]);
-  closeModal('registerModal');
-  showToast(`Welcome, ${name}! 🎉`, 'success');
+  if (error) { showErr(errEl, error.message); return; }
+
+  // Create profile row
+  if (data.user) {
+    await sb.from('player_profiles').insert({ id: data.user.id, display_name: name, is_admin: false });
+  }
+  closeModal();
+  showToast(`Welcome, ${name}! 🎉 Check your email to confirm your account.`, 'success');
 }
 
-async function completeLogin(player) {
-  currentPlayer = player;
-  localStorage.setItem(SESSION_KEY, JSON.stringify(player));
-  predictions = await loadMyPredictions();
-  matchResults = await loadMatchResults();
-  updateAuthBar();
-  renderMatches();
-  if (player.is_admin) addAdminTab();
+async function doForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const errEl = document.getElementById('forgotError');
+  const sucEl = document.getElementById('forgotSuccess');
+  const btn   = document.getElementById('forgotBtn');
+  errEl.style.display = 'none'; sucEl.style.display = 'none';
+  if (!email) { showErr(errEl, 'Please enter your email'); return; }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href
+  });
+  btn.disabled = false; btn.textContent = 'Send Reset Link →';
+  if (error) { showErr(errEl, error.message); return; }
+  sucEl.textContent = '✓ Reset link sent! Check your inbox (and spam folder).';
+  sucEl.style.display = 'block';
 }
 
-async function logout() {
-  currentPlayer = null; predictions = {}; matchResults = {};
-  localStorage.removeItem(SESSION_KEY);
-  updateAuthBar();
-  removeAdminTab();
-  renderMatches();
+async function doChangePassword() {
+  const newP  = document.getElementById('newPass').value;
+  const newP2 = document.getElementById('newPass2').value;
+  const errEl = document.getElementById('passError');
+  const sucEl = document.getElementById('passSuccess');
+  const btn   = document.getElementById('passBtn');
+  errEl.style.display = 'none'; sucEl.style.display = 'none';
+  if (newP.length < 6)  { showErr(errEl, 'Minimum 6 characters'); return; }
+  if (newP !== newP2)   { showErr(errEl, 'Passwords do not match'); return; }
+  btn.disabled = true; btn.textContent = 'Updating…';
+  const { error } = await sb.auth.updateUser({ password: newP });
+  btn.disabled = false; btn.textContent = 'Update Password →';
+  if (error) { showErr(errEl, error.message); return; }
+  sucEl.textContent = '✓ Password updated successfully!';
+  sucEl.style.display = 'block';
+  setTimeout(closeModal, 1500);
+  showToast('Password updated ✓', 'success');
+}
+
+async function doSignOut() {
+  await sb.auth.signOut();
   showToast('Signed out', '');
 }
 
+async function loadProfile() {
+  if (!currentUser) return;
+  const { data } = await sb.from('player_profiles').select('*').eq('id', currentUser.id).single();
+  if (data) {
+    currentProfile = data;
+  } else {
+    // Profile doesn't exist yet — create it from auth metadata
+    const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || 'Player';
+    const { data: created } = await sb.from('player_profiles')
+      .insert({ id: currentUser.id, display_name: name, is_admin: false })
+      .select().single();
+    currentProfile = created;
+  }
+  myPredictions = await loadMyPredictions();
+  matchResults   = await loadMatchResults();
+  if (currentProfile?.is_admin) addAdminTab();
+  else removeAdminTab();
+}
+
 async function loadMyPredictions() {
-  if (!currentPlayer) return {};
-  const res = await sb(`predictions?player_id=eq.${currentPlayer.id}&select=match_id,home_score,away_score`);
-  if (!res) return {};
+  if (!currentUser) return {};
+  const { data } = await sb.from('predictions').select('match_id,home_score,away_score').eq('player_id', currentUser.id);
+  if (!data) return {};
   const map = {};
-  for (const r of res) map[r.match_id] = { home: r.home_score, away: r.away_score };
+  for (const r of data) map[r.match_id] = { home: r.home_score, away: r.away_score };
   return map;
 }
 
 async function loadMatchResults() {
-  const res = await sb('match_results?select=match_id,home_score,away_score');
-  if (!res) return {};
+  const { data } = await sb.from('match_results').select('match_id,home_score,away_score');
+  if (!data) return {};
   const map = {};
-  for (const r of res) map[r.match_id] = { home: r.home_score, away: r.away_score };
+  for (const r of data) map[r.match_id] = { home: r.home_score, away: r.away_score };
   return map;
 }
 
 // ===== AUTH BAR =====
 function updateAuthBar() {
-  const out = document.getElementById('authLoggedOut');
-  const inn = document.getElementById('authLoggedIn');
-  if (currentPlayer) {
-    out.style.display = 'none';
-    inn.style.display = 'flex';
-    document.getElementById('authAvatar').textContent = currentPlayer.name[0].toUpperCase();
-    document.getElementById('authName').textContent = currentPlayer.name;
-    document.getElementById('authRole').textContent = currentPlayer.is_admin ? '⚙️ Admin' : 'Player';
-    const cnt = Object.keys(predictions).length;
+  const out = document.getElementById('authOut');
+  const inn = document.getElementById('authIn');
+  if (currentProfile) {
+    out.style.display = 'none'; inn.style.display = 'flex';
+    document.getElementById('authAvatar').textContent = currentProfile.display_name[0].toUpperCase();
+    document.getElementById('authDisplayName').textContent = currentProfile.display_name;
+    document.getElementById('authRole').textContent = currentProfile.is_admin ? '⚙️ Admin' : 'Player';
+    const cnt = Object.keys(myPredictions).length;
     document.getElementById('authPredCount').textContent = `${cnt} prediction${cnt!==1?'s':''} saved`;
   } else {
-    out.style.display = 'flex';
-    inn.style.display = 'none';
+    out.style.display = 'flex'; inn.style.display = 'none';
   }
 }
 
+// ===== ADMIN TAB =====
 function addAdminTab() {
   if (document.getElementById('adminTab')) return;
-  const tab = document.createElement('button');
-  tab.id = 'adminTab';
-  tab.className = 'nav-tab admin-tab';
-  tab.textContent = '⚙️ Admin';
-  tab.onclick = () => { showSection('admin', tab); renderAdmin(); };
-  document.getElementById('navTabs').appendChild(tab);
+  const t = document.createElement('button');
+  t.id='adminTab'; t.className='nav-tab admin-tab'; t.textContent='⚙️ Admin';
+  t.onclick=()=>{ showSection('admin',t); renderAdmin(); };
+  document.getElementById('navTabs').appendChild(t);
 }
-
-function removeAdminTab() {
-  document.getElementById('adminTab')?.remove();
-}
+function removeAdminTab() { document.getElementById('adminTab')?.remove(); }
 
 // ===== SECTION NAV =====
 function showSection(name, btn) {
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById(`section-${name}`).classList.add('active');
-  if (btn) btn.classList.add('active');
-  else document.querySelector(`.nav-tab:first-child`)?.classList.add('active');
-  if (name==='leaderboard') renderLeaderboard();
-  if (name==='stats') renderStats();
+  if(btn) btn.classList.add('active');
+  if(name==='leaderboard') renderLeaderboard();
+  if(name==='stats') renderStats();
 }
 
-// ===== SCORING ENGINE =====
-function calcPoints(pred, result) {
-  if (!pred || !result) return null;
-  const ph = pred.home, pa = pred.away, rh = result.home, ra = result.away;
-  if (ph===rh && pa===ra) return 3; // exact
-  const predDiff = ph-pa, resDiff = rh-ra;
-  if (predDiff===resDiff) return 2;  // correct difference
-  const predResult = ph>pa?1:ph<pa?-1:0;
-  const resResult  = rh>ra?1:rh<ra?-1:0;
-  if (predResult===resResult) return 1; // correct outcome
-  return 0;
+// ===== SCORING =====
+function calcPts(pred, result) {
+  if(!pred||!result) return null;
+  const {home:ph,away:pa}=pred, {home:rh,away:ra}=result;
+  if(ph===rh&&pa===ra) return 3;
+  if((ph-pa)===(rh-ra)) return 2;
+  const pr=ph>pa?1:ph<pa?-1:0, rr=rh>ra?1:rh<ra?-1:0;
+  return pr===rr?1:0;
 }
 
 // ===== RENDER MATCHES =====
 function renderMatches() {
-  const container = document.getElementById('matchesContainer');
-  const phases = ['Group Stage','Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
-  document.getElementById('phaseFilter').innerHTML = phases.map(p =>
+  const phases=['Group Stage','Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
+  document.getElementById('phaseFilter').innerHTML=phases.map(p=>
     `<button class="phase-btn${activePhaseFilter===p?' active':''}" onclick="filterPhase('${p}')">${p}</button>`
   ).join('');
 
-  const grouped = {};
-  for (const m of MATCHES) {
-    const phase = m.group ? `Group ${m.group}` : m.phase;
-    const inFilter = activePhaseFilter==='Group Stage' ? !!m.group : m.phase===activePhaseFilter;
-    if (!inFilter) continue;
-    if (!grouped[phase]) grouped[phase] = [];
-    grouped[phase].push(m);
-  }
+  const container=document.getElementById('matchesContainer');
 
-  if (!currentPlayer) {
-    container.innerHTML = `<div style="text-align:center;padding:60px;color:var(--text-muted)">
-      <div style="font-size:48px;margin-bottom:16px">🔒</div>
-      <div style="font-size:16px;font-weight:600;margin-bottom:8px">Sign in to add predictions</div>
-      <div style="font-size:13px;margin-bottom:20px">Create an account or sign in to start predicting match scores.</div>
-      <button class="btn btn-primary" onclick="showLoginModal()">Sign In</button>
-      &nbsp;
-      <button class="btn btn-secondary" onclick="showRegisterModal()">Register</button>
+  if (!currentProfile) {
+    container.innerHTML=`<div class="locked-state">
+      <div class="locked-icon">🔒</div>
+      <div class="locked-title">Sign in to add predictions</div>
+      <div class="locked-sub">Create an account or sign in with your email and password.</div>
+      <button class="btn btn-primary" onclick="openAuth('login')" style="margin-right:8px">Sign In</button>
+      <button class="btn btn-secondary" onclick="openAuth('register')">Register</button>
     </div>`;
     return;
   }
 
-  if (Object.keys(grouped).length===0) {
-    container.innerHTML='<div class="loading">No matches in this phase</div>'; return;
+  const grouped={};
+  for(const m of MATCHES){
+    const inFilter=activePhaseFilter==='Group Stage'?!!m.group:m.phase===activePhaseFilter;
+    if(!inFilter) continue;
+    const key=m.group?`Group ${m.group}`:m.phase;
+    if(!grouped[key]) grouped[key]=[];
+    grouped[key].push(m);
   }
 
-  // Progress bar for group stage
-  let html = '';
-  if (activePhaseFilter==='Group Stage') {
-    const total = MATCHES.filter(m=>m.group).length;
-    const done = MATCHES.filter(m=>m.group && predictions[m.id]!==undefined).length;
-    const pct = total>0?Math.round((done/total)*100):0;
-    html += `<div style="margin-bottom:20px">
+  let html='';
+  if(activePhaseFilter==='Group Stage'){
+    const total=MATCHES.filter(m=>m.group).length;
+    const done=Object.keys(myPredictions).filter(id=>MATCHES.find(m=>m.id==id&&m.group)).length;
+    const pct=Math.round((done/total)*100);
+    html+=`<div style="margin-bottom:20px">
       <div style="display:flex;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:13px;color:var(--text-muted);font-weight:600">Group Stage Progress</span>
         <span style="font-size:13px;color:var(--accent);font-weight:700">${done}/${total}</span>
@@ -606,156 +666,124 @@ function renderMatches() {
     </div>`;
   }
 
-  html += Object.entries(grouped).map(([phase,matches]) =>
+  html+=Object.entries(grouped).map(([phase,matches])=>
     `<div class="phase-section">
       <div class="phase-title">${phase}</div>
-      <div class="match-grid">${matches.map(m=>renderMatchCard(m)).join('')}</div>
+      <div class="match-grid">${matches.map(m=>matchCard(m)).join('')}</div>
     </div>`
   ).join('');
 
-  container.innerHTML = html;
+  container.innerHTML=html;
 }
 
-function renderMatchCard(m) {
-  const pred = predictions[m.id];
-  const result = matchResults[m.id];
-  const hasPred = pred !== undefined;
-  const hasResult = result !== undefined;
-  const pts = hasPred && hasResult ? calcPoints(pred, result) : null;
+function matchCard(m) {
+  const pred=myPredictions[m.id], result=matchResults[m.id];
+  const hasPred=pred!==undefined, hasResult=result!==undefined;
+  const pts=hasPred&&hasResult?calcPts(pred,result):null;
+  let cls='match-card';
+  if(hasPred) cls+=' has-prediction';
+  if(hasResult) cls+=' has-result';
+  const hv=hasPred?pred.home:'', av=hasPred?pred.away:'';
+  const dateStr=new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short'});
+  const ptsBadge=pts!==null?`<div class="pts-badge pts-${pts}">${pts} PT${pts!==1?'S':'S'}</div>`:'';
+  const saveInd=hasPred?`<div class="save-ind"><span class="dot-saved"></span>Saved</div>`:'';
+  const actualDisplay=hasResult?`<div class="actual-result"><span class="actual-label">Result:</span><span class="actual-score">${result.home}–${result.away}</span></div>`:'';
+  const disabled=hasResult?'disabled':'';
 
-  let cardClass = 'match-card';
-  if (hasPred) cardClass += ' has-prediction';
-  if (hasResult) cardClass += ' result-entered';
-
-  const homeVal = hasPred ? pred.home : '';
-  const awayVal = hasPred ? pred.away : '';
-  const dateStr = new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short'});
-
-  const ptsBadge = pts!==null ? `<div class="points-badge points-${pts}">${pts} PT${pts!==1?'S':'S'}</div>` : '';
-  const saveInd = hasPred ? `<div class="save-indicator"><span class="saved-dot"></span>Saved</div>` : '';
-
-  if (m.group) {
-    const hName=TEAMS[m.home]||'?', hFlag=FLAGS[m.home]||'🏳️';
-    const aName=TEAMS[m.away]||'?', aFlag=FLAGS[m.away]||'🏳️';
-    const actualDisplay = hasResult
-      ? `<div class="actual-result" style="margin-top:8px">
-           <span class="actual-label">Result:</span>
-           <span class="actual-score">${result.home} – ${result.away}</span>
-         </div>` : '';
-    return `<div class="${cardClass}" id="match-${m.id}">
-      <div class="match-meta">
-        <span class="match-date">📅 ${dateStr} · ${m.time}</span>
-        <span class="group-badge">Group ${m.group}</span>
-      </div>
+  if(m.group){
+    const hN=TEAMS[m.home]||'?',hF=FLAGS[m.home]||'🏳️',aN=TEAMS[m.away]||'?',aF=FLAGS[m.away]||'🏳️';
+    return `<div class="${cls}" id="mc-${m.id}">
+      <div class="match-meta"><span class="match-date">📅 ${dateStr} · ${m.time}</span><span class="group-badge">Group ${m.group}</span></div>
       ${saveInd}${ptsBadge}
       <div class="match-teams">
-        <div class="team-side"><span class="team-flag">${hFlag}</span><span class="team-name">${hName}</span></div>
+        <div class="team-side"><span class="team-flag">${hF}</span><span class="team-name">${hN}</span></div>
         <div class="score-area">
-          <input type="number" class="score-input" min="0" max="99" value="${homeVal}" id="h-${m.id}" placeholder="–"
-            oninput="onScoreChange(${m.id})" ${hasResult?'disabled':''}>
+          <input type="number" class="score-input" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${disabled}>
           <span class="score-sep">:</span>
-          <input type="number" class="score-input" min="0" max="99" value="${awayVal}" id="a-${m.id}" placeholder="–"
-            oninput="onScoreChange(${m.id})" ${hasResult?'disabled':''}>
+          <input type="number" class="score-input" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${disabled}>
         </div>
-        <div class="team-side away"><span class="team-flag">${aFlag}</span><span class="team-name">${aName}</span></div>
-      </div>
-      ${actualDisplay}
+        <div class="team-side away"><span class="team-flag">${aF}</span><span class="team-name">${aN}</span></div>
+      </div>${actualDisplay}
     </div>`;
   } else {
-    const actualDisplay = hasResult
-      ? `<div class="actual-result" style="margin-top:8px">
-           <span class="actual-label">Result:</span>
-           <span class="actual-score">${result.home} – ${result.away}</span>
-         </div>` : '';
-    return `<div class="${cardClass}" id="match-${m.id}">
-      <div class="match-meta">
-        <span class="match-date">📅 ${dateStr}</span>
-        <span class="group-badge">${m.phase}</span>
-      </div>
+    return `<div class="${cls}" id="mc-${m.id}">
+      <div class="match-meta"><span class="match-date">📅 ${dateStr}</span><span class="group-badge">${m.phase}</span></div>
       ${saveInd}${ptsBadge}
       <div class="match-label">${m.label||''}</div>
       <div class="match-teams">
         <div class="team-side"><span class="team-flag">🏴</span><span class="team-name">TBD</span></div>
         <div class="score-area">
-          <input type="number" class="score-input" min="0" max="99" value="${homeVal}" id="h-${m.id}" placeholder="–"
-            oninput="onScoreChange(${m.id})" ${hasResult?'disabled':''}>
+          <input type="number" class="score-input" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${disabled}>
           <span class="score-sep">:</span>
-          <input type="number" class="score-input" min="0" max="99" value="${awayVal}" id="a-${m.id}" placeholder="–"
-            oninput="onScoreChange(${m.id})" ${hasResult?'disabled':''}>
+          <input type="number" class="score-input" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${disabled}>
         </div>
         <div class="team-side away"><span class="team-flag">🏴</span><span class="team-name">TBD</span></div>
-      </div>
-      ${actualDisplay}
+      </div>${actualDisplay}
     </div>`;
   }
 }
 
-function filterPhase(phase) { activePhaseFilter=phase; renderMatches(); }
+function filterPhase(p){ activePhaseFilter=p; renderMatches(); }
 
-// ===== SCORE INPUT =====
-function onScoreChange(matchId) {
-  if (!currentPlayer) return;
-  const h = document.getElementById(`h-${matchId}`).value;
-  const a = document.getElementById(`a-${matchId}`).value;
-  if (h===''||a==='') return;
+function onScore(matchId) {
+  if(!currentUser) return;
+  const h=document.getElementById(`h-${matchId}`).value;
+  const a=document.getElementById(`a-${matchId}`).value;
+  if(h===''||a==='') return;
   const hi=parseInt(h), ai=parseInt(a);
-  if (isNaN(hi)||isNaN(ai)||hi<0||ai<0) return;
-  predictions[matchId]={home:hi,away:ai};
-  const card=document.getElementById(`match-${matchId}`);
-  if (card && !card.classList.contains('has-prediction')) card.classList.add('has-prediction');
-  let ind=card?.querySelector('.save-indicator');
-  if (ind) ind.innerHTML=`<span class="saving-dot"></span>Saving…`;
-  else if (card) { card.insertAdjacentHTML('beforeend',`<div class="save-indicator" id="ind-${matchId}"><span class="saving-dot"></span>Saving…</div>`); ind=card.querySelector('.save-indicator'); }
+  if(isNaN(hi)||isNaN(ai)||hi<0||ai<0) return;
+  myPredictions[matchId]={home:hi,away:ai};
+  const card=document.getElementById(`mc-${matchId}`);
+  if(card&&!card.classList.contains('has-prediction')) card.classList.add('has-prediction');
+  let ind=card?.querySelector('.save-ind');
+  if(ind) ind.innerHTML=`<span class="dot-saving"></span>Saving…`;
+  else if(card){ card.insertAdjacentHTML('beforeend',`<div class="save-ind" id="ind-${matchId}"><span class="dot-saving"></span>Saving…</div>`); ind=card.querySelector('.save-ind'); }
   clearTimeout(saveTimers[matchId]);
   saveTimers[matchId]=setTimeout(async()=>{
-    await sb('predictions',{
-      method:'POST', prefer:'resolution=merge-duplicates,return=minimal',
-      body:JSON.stringify({player_id:currentPlayer.id,match_id:matchId,home_score:hi,away_score:ai})
-    });
-    if(ind) ind.innerHTML=`<span class="saved-dot"></span>Saved`;
-    document.getElementById('authPredCount').textContent=`${Object.keys(predictions).length} predictions saved`;
+    const {error}=await sb.from('predictions').upsert({
+      player_id:currentUser.id, match_id:matchId, home_score:hi, away_score:ai
+    },{onConflict:'player_id,match_id'});
+    if(!error&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
+    const cnt=Object.keys(myPredictions).length;
+    document.getElementById('authPredCount').textContent=`${cnt} predictions saved`;
   },600);
 }
 
 // ===== LEADERBOARD =====
 async function renderLeaderboard() {
-  const container = document.getElementById('leaderboardContainer');
+  const container=document.getElementById('leaderboardContainer');
   container.innerHTML='<div class="loading"><div class="spinner"></div>Loading…</div>';
-  const [players, allPreds] = await Promise.all([
-    sb('players?select=id,name,is_admin&order=name'),
-    sb('predictions?select=player_id,match_id,home_score,away_score')
+  const [{data:profiles},{data:allPreds},{data:results}]=await Promise.all([
+    sb.from('player_profiles').select('id,display_name,is_admin').order('display_name'),
+    sb.from('predictions').select('player_id,match_id,home_score,away_score'),
+    sb.from('match_results').select('match_id,home_score,away_score')
   ]);
-  allPlayers = (players||[]).filter(p=>!p.is_admin);
-
-  const scoreboard = allPlayers.map(player=>{
-    const preds = (allPreds||[]).filter(p=>p.player_id===player.id);
-    let total=0, exact=0, correct=0, filled=preds.length;
-    for (const p of preds) {
-      const result=matchResults[p.match_id];
-      if (!result) continue;
-      const pts=calcPoints({home:p.home_score,away:p.away_score},result);
-      if (pts!==null){total+=pts;if(pts===3)exact++;if(pts>0)correct++;}
+  const resMap={};
+  for(const r of (results||[])) resMap[r.match_id]={home:r.home_score,away:r.away_score};
+  const players=(profiles||[]).filter(p=>!p.is_admin);
+  const scoreboard=players.map(p=>{
+    const preds=(allPreds||[]).filter(x=>x.player_id===p.id);
+    let total=0,exact=0,correct=0;
+    for(const pr of preds){
+      const pts=calcPts({home:pr.home_score,away:pr.away_score},resMap[pr.match_id]);
+      if(pts!==null){total+=pts;if(pts===3)exact++;if(pts>0)correct++;}
     }
-    return {...player,total,exact,correct,filled};
+    return {...p,total,exact,correct,filled:preds.length};
   }).sort((a,b)=>b.total-a.total||b.exact-a.exact||b.filled-a.filled);
-
-  const rankClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
-  const rankEmoji=i=>i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
-
+  const rk=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
+  const em=i=>i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
   container.innerHTML=`
     <div style="margin-bottom:20px">
       <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px">🏆 Leaderboard</div>
-      <div style="font-size:13px;color:var(--text-muted)">Points: Exact score = 3pts · Correct difference = 2pts · Correct result = 1pt</div>
+      <div style="font-size:13px;color:var(--text-muted)">Exact = 3pts · Correct difference = 2pts · Correct result = 1pt</div>
     </div>
     <div class="lb-table">
-      <div class="lb-row lb-header">
-        <div>#</div><div>Player</div><div>Points</div><div>Exact</div><div>Correct</div><div>Filled</div>
-      </div>
+      <div class="lb-row lb-header"><div>#</div><div>Player</div><div>Points</div><div>Exact</div><div>Correct</div><div>Filled</div></div>
       ${scoreboard.map((p,i)=>{
-        const isMe=currentPlayer&&p.id===currentPlayer.id;
+        const isMe=currentProfile&&p.id===currentProfile.id;
         return `<div class="lb-row${isMe?' lb-me':''}">
-          <div class="lb-rank ${rankClass(i)}">${rankEmoji(i)}</div>
-          <div class="lb-name">${isMe?'👤 ':''}${p.name}</div>
+          <div class="lb-rank ${rk(i)}">${em(i)}</div>
+          <div class="lb-name">${isMe?'👤 ':''}${p.display_name}</div>
           <div class="lb-pts">${p.total}</div>
           <div class="lb-exact">${p.exact}</div>
           <div class="lb-stat">${p.correct}</div>
@@ -768,39 +796,39 @@ async function renderLeaderboard() {
 
 // ===== STATS =====
 async function renderStats() {
-  const container = document.getElementById('statsContainer');
-  if (!currentPlayer) { container.innerHTML='<div class="loading">Sign in to see your stats</div>'; return; }
-  const myPreds=Object.keys(predictions).length;
-  const resultsCount=Object.keys(matchResults).length;
-  let myPts=0,myExact=0,myCorrect=0;
-  for (const [mid,pred] of Object.entries(predictions)){
-    const pts=calcPoints(pred,matchResults[mid]);
-    if(pts!==null){myPts+=pts;if(pts===3)myExact++;if(pts>0)myCorrect++;}
+  const container=document.getElementById('statsContainer');
+  if(!currentProfile){container.innerHTML='<div class="loading">Sign in to see your stats</div>';return;}
+  const cnt=Object.keys(myPredictions).length;
+  const resCount=Object.keys(matchResults).length;
+  let pts=0,exact=0,correct=0;
+  for(const[mid,pred]of Object.entries(myPredictions)){
+    const p=calcPts(pred,matchResults[mid]);
+    if(p!==null){pts+=p;if(p===3)exact++;if(p>0)correct++;}
   }
-  const groupCoverage={};
-  for (const m of MATCHES){
+  const gc={};
+  for(const m of MATCHES){
     if(!m.group)continue;
-    if(!groupCoverage[m.group])groupCoverage[m.group]={total:0,filled:0};
-    groupCoverage[m.group].total++;
-    if(predictions[m.id]!==undefined)groupCoverage[m.group].filled++;
+    if(!gc[m.group])gc[m.group]={total:0,filled:0};
+    gc[m.group].total++;
+    if(myPredictions[m.id]!==undefined)gc[m.group].filled++;
   }
   container.innerHTML=`
     <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px;margin-bottom:20px">📊 My Stats</div>
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-number">${myPts}</div><div class="stat-label">Total Points</div></div>
-      <div class="stat-card"><div class="stat-number">${myExact}</div><div class="stat-label">Exact Scores</div></div>
-      <div class="stat-card"><div class="stat-number">${myCorrect}</div><div class="stat-label">Correct Results</div></div>
-      <div class="stat-card"><div class="stat-number">${myPreds}</div><div class="stat-label">Predictions Made</div></div>
-      <div class="stat-card"><div class="stat-number">${resultsCount}</div><div class="stat-label">Results Entered</div></div>
+      <div class="stat-card"><div class="stat-num">${pts}</div><div class="stat-lbl">Total Points</div></div>
+      <div class="stat-card"><div class="stat-num">${exact}</div><div class="stat-lbl">Exact Scores</div></div>
+      <div class="stat-card"><div class="stat-num">${correct}</div><div class="stat-lbl">Correct Results</div></div>
+      <div class="stat-card"><div class="stat-num">${cnt}</div><div class="stat-lbl">Predictions Made</div></div>
+      <div class="stat-card"><div class="stat-num">${resCount}</div><div class="stat-lbl">Results Entered</div></div>
     </div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--text-muted);letter-spacing:2px;margin-bottom:12px">Group Coverage</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">
-      ${Object.entries(groupCoverage).sort(([a],[b])=>a.localeCompare(b)).map(([grp,data])=>{
-        const pct=Math.round((data.filled/data.total)*100);
+      ${Object.entries(gc).sort(([a],[b])=>a.localeCompare(b)).map(([grp,d])=>{
+        const pct=Math.round((d.filled/d.total)*100);
         return `<div class="stat-card" style="padding:14px;cursor:pointer" onclick="filterPhase('Group Stage');showSection('predictions')">
           <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--accent)">Group ${grp}</div>
           <div style="font-size:24px;font-family:'Bebas Neue',sans-serif;color:${pct===100?'var(--correct-border)':'var(--page-text)'}">${pct}%</div>
-          <div style="font-size:11px;color:var(--text-muted)">${data.filled}/${data.total}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${d.filled}/${d.total}</div>
           <div style="height:3px;background:var(--card-border);border-radius:2px;margin-top:6px">
             <div style="height:100%;background:${pct===100?'var(--correct-border)':'var(--accent)'};border-radius:2px;width:${pct}%"></div>
           </div>
@@ -809,77 +837,58 @@ async function renderStats() {
     </div>`;
 }
 
-// ===== ADMIN PANEL =====
+// ===== ADMIN =====
 async function renderAdmin() {
-  if (!currentPlayer?.is_admin) return;
-  const container = document.getElementById('adminContainer');
-  container.innerHTML='<div class="loading"><div class="spinner"></div>Loading admin panel…</div>';
-  matchResults = await loadMatchResults();
-  const players = await sb('players?select=id,name,is_admin&order=name') || [];
-
-  // Group matches for admin
-  const groupedPhases={};
+  if(!currentProfile?.is_admin) return;
+  const container=document.getElementById('adminContainer');
+  container.innerHTML='<div class="loading"><div class="spinner"></div>Loading admin…</div>';
+  matchResults=await loadMatchResults();
+  const {data:players}=await sb.from('player_profiles').select('id,display_name,is_admin').order('display_name');
   const phases=['Group Stage','Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
-  for (const m of MATCHES){
-    const ph = m.group?'Group Stage':m.phase;
-    if(!groupedPhases[ph])groupedPhases[ph]=[];
-    groupedPhases[ph].push(m);
-  }
-
+  const phaseMap={};
+  for(const m of MATCHES){const ph=m.group?'Group Stage':m.phase;if(!phaseMap[ph])phaseMap[ph]=[];phaseMap[ph].push(m);}
   container.innerHTML=`
     <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:#e74c3c;letter-spacing:2px;margin-bottom:4px">⚙️ Admin Panel</div>
-    <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px">Enter actual match results and manage players</div>
-
-    <!-- Players management -->
-    <div class="admin-section">
-      <div class="admin-title">Players (${players.filter(p=>!p.is_admin).length})</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px">Enter actual results · Manage players</div>
+    <div style="margin-bottom:32px">
+      <div class="admin-title">Players (${(players||[]).filter(p=>!p.is_admin).length})</div>
       <div class="players-mgmt">
-        <div class="player-mgmt-row header"><div>Name</div><div>Role</div><div>Actions</div></div>
-        ${players.map(p=>`
-          <div class="player-mgmt-row">
-            <div style="font-weight:600">${p.name}</div>
-            <div style="font-size:12px;color:var(--text-muted)">${p.is_admin?'⚙️ Admin':'Player'}</div>
-            <div>
-              ${!p.is_admin?`<button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="openResetModal('${p.id}','${p.name}')">Reset PW</button>`:'—'}
-            </div>
-          </div>`).join('')}
+        <div class="pmgmt-row header"><div>Name</div><div>Email visible</div></div>
+        ${(players||[]).map(p=>`<div class="pmgmt-row">
+          <div style="font-weight:600">${p.is_admin?'⚙️ ':''} ${p.display_name}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${p.is_admin?'Admin':'Player'}</div>
+        </div>`).join('')}
       </div>
+      <div style="font-size:12px;color:var(--text-subtle);margin-top:8px">Manage full user accounts in your Supabase Dashboard → Authentication → Users</div>
     </div>
-
-    <!-- Results entry by phase -->
     ${phases.map(phase=>{
-      const matches=groupedPhases[phase]||[];
-      if(matches.length===0)return'';
-      return `<div class="admin-section">
-        <div class="admin-title">Results: ${phase} (${matches.filter(m=>matchResults[m.id]).length}/${matches.length})</div>
+      const matches=phaseMap[phase]||[];
+      if(!matches.length) return '';
+      const done=matches.filter(m=>matchResults[m.id]).length;
+      return `<div style="margin-bottom:32px">
+        <div class="admin-title">Results: ${phase} (${done}/${matches.length})</div>
         <div class="match-grid">
           ${matches.map(m=>{
             const res=matchResults[m.id];
-            const hName=m.group?(TEAMS[m.home]||'?'):'Home TBD';
-            const aName=m.group?(TEAMS[m.away]||'?'):'Away TBD';
-            const hFlag=m.group?(FLAGS[m.home]||'🏳️'):'🏴';
-            const aFlag=m.group?(FLAGS[m.away]||'🏳️'):'🏴';
-            const dateStr=new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+            const hN=m.group?(TEAMS[m.home]||'?'):'Home TBD', hF=m.group?(FLAGS[m.home]||'🏳️'):'🏴';
+            const aN=m.group?(TEAMS[m.away]||'?'):'Away TBD', aF=m.group?(FLAGS[m.away]||'🏳️'):'🏴';
+            const ds=new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
             return `<div class="admin-match-card${res?' has-result':''}">
               <div class="match-meta" style="margin-bottom:10px">
-                <span class="match-date">📅 ${dateStr} ${m.time||''} — ${m.label||`${hName} vs ${aName}`}</span>
+                <span class="match-date">📅 ${ds} — ${m.label||`${hN} vs ${aN}`}</span>
                 <span class="group-badge">${m.group?`Group ${m.group}`:m.phase}</span>
               </div>
               <div class="match-teams">
-                <div class="team-side"><span class="team-flag">${hFlag}</span><span class="team-name" style="max-width:110px">${hName}</span></div>
+                <div class="team-side"><span class="team-flag">${hF}</span><span class="team-name" style="max-width:110px">${hN}</span></div>
                 <div class="score-area">
-                  <input type="number" class="score-input admin-input" min="0" max="99"
-                    value="${res?res.home:''}" id="rh-${m.id}" placeholder="–">
+                  <input type="number" class="score-input admin-input" min="0" max="99" value="${res?res.home:''}" id="rh-${m.id}" placeholder="–">
                   <span class="score-sep">:</span>
-                  <input type="number" class="score-input admin-input" min="0" max="99"
-                    value="${res?res.away:''}" id="ra-${m.id}" placeholder="–">
+                  <input type="number" class="score-input admin-input" min="0" max="99" value="${res?res.away:''}" id="ra-${m.id}" placeholder="–">
                 </div>
-                <div class="team-side away"><span class="team-flag">${aFlag}</span><span class="team-name" style="max-width:110px">${aName}</span></div>
+                <div class="team-side away"><span class="team-flag">${aF}</span><span class="team-name" style="max-width:110px">${aN}</span></div>
               </div>
-              <div class="admin-actions" style="margin-top:10px">
-                <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="saveResult(${m.id})">
-                  ${res?'Update Result':'Save Result'}
-                </button>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+                <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="saveResult(${m.id})">${res?'Update':'Save Result'}</button>
                 ${res?`<button class="btn btn-danger" style="padding:6px 14px;font-size:12px" onclick="deleteResult(${m.id})">Clear</button>`:''}
                 ${res?`<span style="font-size:12px;color:var(--correct-border)">✓ ${res.home}–${res.away} saved</span>`:''}
               </div>
@@ -894,74 +903,38 @@ async function saveResult(matchId) {
   const h=parseInt(document.getElementById(`rh-${matchId}`).value);
   const a=parseInt(document.getElementById(`ra-${matchId}`).value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){showToast('Enter valid scores','error');return;}
-  const res=await sb('match_results',{
-    method:'POST', prefer:'resolution=merge-duplicates,return=minimal',
-    body:JSON.stringify({match_id:matchId,home_score:h,away_score:a})
-  });
-  if(res!==null){
-    matchResults[matchId]={home:h,away:a};
-    showToast(`Result saved: ${h}–${a} ✓`,'success');
-    renderAdmin();
-  } else showToast('Error saving result','error');
+  const {error}=await sb.from('match_results').upsert({match_id:matchId,home_score:h,away_score:a},{onConflict:'match_id'});
+  if(!error){matchResults[matchId]={home:h,away:a};showToast(`Result saved: ${h}–${a} ✓`,'success');renderAdmin();}
+  else showToast('Error saving result','error');
 }
 
 async function deleteResult(matchId) {
   if(!confirm('Remove this result?'))return;
-  const res=await sb(`match_results?match_id=eq.${matchId}`,{method:'DELETE',prefer:'return=minimal'});
-  if(res!==null){delete matchResults[matchId];showToast('Result removed','');renderAdmin();}
+  const {error}=await sb.from('match_results').delete().eq('match_id',matchId);
+  if(!error){delete matchResults[matchId];showToast('Result removed','');renderAdmin();}
 }
 
-function openResetModal(playerId, playerName) {
-  document.getElementById('resetPlayerId').value=playerId;
-  document.getElementById('resetModalSubtitle').textContent=`Set a new password for ${playerName}.`;
-  document.getElementById('resetNewPass').value='';
-  document.getElementById('resetError').style.display='none';
-  document.getElementById('resetModal').style.display='flex';
+// ===== AUTH MODAL =====
+function openAuth(panel='login') {
+  document.getElementById('authModal').style.display='flex';
+  switchTab(panel);
 }
 
-async function doResetPassword() {
-  const playerId=document.getElementById('resetPlayerId').value;
-  const newPass=document.getElementById('resetNewPass').value;
-  const errEl=document.getElementById('resetError');
-  if(newPass.length<4){showErr(errEl,'Minimum 4 characters');return;}
-  const hash=await sha256(newPass);
-  const res=await sb(`players?id=eq.${playerId}`,{
-    method:'PATCH', prefer:'return=minimal',
-    body:JSON.stringify({password_hash:hash})
+function switchTab(panel) {
+  const panels=['Login','Register','Forgot','Password'];
+  panels.forEach(p=>document.getElementById(`panel${p}`).style.display='none');
+  document.getElementById(`panel${panel.charAt(0).toUpperCase()+panel.slice(1)}`).style.display='block';
+  // Update tab bar highlight
+  ['login','register'].forEach(t=>{
+    const btn=document.getElementById(`tab${t.charAt(0).toUpperCase()+t.slice(1)}`);
+    if(btn) btn.classList.toggle('active',t===panel);
   });
-  if(res!==null){showToast('Password updated ✓','success');closeModal('resetModal');}
-  else showErr(errEl,'Error updating password');
+  // Hide tab bar for forgot/password panels
+  document.getElementById('authTabBar').style.display=(panel==='forgot'||panel==='password')?'none':'flex';
 }
 
-// ===== MODALS =====
-async function showLoginModal() {
-  document.getElementById('loginName').value='';
-  document.getElementById('loginPass').value='';
-  document.getElementById('loginError').style.display='none';
-  document.getElementById('loginModal').style.display='flex';
-  // Load player list
-  const players=await sb('players?select=name,is_admin&order=name&is_admin=eq.false')||[];
-  const nonAdmin=players.filter(p=>!p.is_admin);
-  document.getElementById('playerList').innerHTML=nonAdmin.map(p=>`
-    <div class="player-item" onclick="document.getElementById('loginName').value='${p.name}';document.getElementById('loginPass').focus()">
-      <span class="player-item-name">${p.name}</span>
-      <span class="player-item-info">Click to select</span>
-    </div>`).join('') || '<div style="font-size:12px;color:var(--text-subtle)">No players registered yet</div>';
-}
-
-function showRegisterModal() {
-  document.getElementById('regName').value='';
-  document.getElementById('regPass').value='';
-  document.getElementById('regPass2').value='';
-  document.getElementById('regError').style.display='none';
-  document.getElementById('registerModal').style.display='flex';
-}
-
-function closeModal(id) { document.getElementById(id).style.display='none'; }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-overlay').forEach(m=>m.style.display='none'); });
-document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m)m.style.display='none'; }));
-
-function showErr(el,msg){el.textContent=msg;el.style.display='block';}
+function closeModal() { document.getElementById('authModal').style.display='none'; }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
 // ===== THEME =====
 function setTheme(t){
@@ -970,33 +943,21 @@ function setTheme(t){
   localStorage.setItem('wcup2026_theme',t);
 }
 
-// ===== TOAST =====
+// ===== HELPERS =====
+function showErr(el,msg){el.textContent=msg;el.style.display='block';}
 function showToast(msg,type=''){
   const t=document.getElementById('toast');
-  t.textContent=msg; t.className=`toast ${type} show`;
-  setTimeout(()=>t.classList.remove('show'),3000);
+  t.textContent=msg;t.className=`toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'),3500);
 }
 
 // ===== INIT =====
-async function init(){
-  const savedTheme=localStorage.getItem('wcup2026_theme')||'default';
-  setTheme(savedTheme);
+async function init() {
+  setTheme(localStorage.getItem('wcup2026_theme')||'default');
   matchResults=await loadMatchResults();
-  const session=localStorage.getItem(SESSION_KEY);
-  if(session){
-    try{
-      const saved=JSON.parse(session);
-      // Re-verify session is still valid
-      const check=await sb(`players?id=eq.${saved.id}&select=id,name,is_admin`);
-      if(check&&check.length>0){
-        await completeLogin(check[0]);
-        return;
-      }
-    } catch(e){}
-  }
+  // Auth state handled by onAuthStateChange listener above
   renderMatches();
 }
-
 init();
 </script>
 </body>
