@@ -412,8 +412,8 @@ async function sbSignIn(email, password) {
 
 async function sbSignUp(email, password) {
   const r = await sbAuth('signup', { email, password });
+  console.log('SIGNUP RAW RESPONSE:', JSON.stringify(r));
   if (r.error) return { data: null, error: r.error };
-  // Supabase returns user data directly at r.data
   const user = r.data;
   const session = user?.session || null;
   if (session?.access_token) {
@@ -421,7 +421,6 @@ async function sbSignUp(email, password) {
     localStorage.setItem('sb_session', JSON.stringify(session));
     _authCallbacks.forEach(cb => cb('SIGNED_IN', session));
   }
-  // Return in SDK format: { data: { user } }
   return { data: { user: user, id: user?.id }, error: null };
 }
 
@@ -743,6 +742,7 @@ async function doRegister() {
   btn.disabled = true; btn.textContent = 'Creating…';
   const { data, error } = await sb.auth.signUp({ email, password: pass });
   btn.disabled = false; btn.textContent = 'Create Account →';
+  console.log('REGISTER data:', JSON.stringify(data), 'error:', JSON.stringify(error));
   if (error) { showErr(errEl, error.message || JSON.stringify(error)); return; }
 
   // Raw auth response has user id at data.id (not data.user.id)
