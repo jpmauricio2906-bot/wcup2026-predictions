@@ -6,8 +6,7 @@
 <title>FIFA World Cup 2026 — Predictions</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<!-- Supabase JS SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 :root {
   --page-bg:#0a0e1a;--page-text:#e8eaf0;--card-bg:#111828;--card-border:#1e2838;
@@ -360,9 +359,262 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 const SUPABASE_URL = 'https://bbcmrgsxxowjwcmgrilk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_7g8UYr7kQ1d9Lg0vafvC8A_UGGcwLZX';
 
-// Init Supabase client
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+// ===== SUPABASE HELPERS (plain fetch, no SDK) =====
+const SB_HEADERS = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': `Bearer ${SUPABASE_KEY}`,
+  'Content-Type': 'application/json'
+};
+
+// Auth state callbacks
+let _authCallbacks = [];
+let _currentSession = null;
+
+function onAuthStateChange(callback) {
+  _authCallbacks.push(callback);
+  // Check localStorage for existing session on init
+  const saved = localStorage.getItem('sb_session');
+  if (saved) {
+    try {
+      const session = JSON.parse(saved);
+      if (session?.access_token) {
+        _currentSession = session;
+        setTimeout(() => callback('SIGNED_IN', session), 0);
+        return;
+      }
+    } catch(e) {}
+  }
+  setTimeout(() => callback('SIGNED_OUT', null), 0);
+}
+
+async function sbAuth(path, body) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    return { data, error: data.error ? data : null };
+  } catch(e) {
+    return { data: null, error: { message: e.message } };
+  }
+}
+
+async function sbSignIn(email, password) {
+  const r = await sbAuth('token?grant_type=password', { email, password });
+  if (r.error || !r.data?.access_token) return { error: r.error || r.data };
+  _currentSession = r.data;
+  localStorage.setItem('sb_session', JSON.stringify(r.data));
+  _authCallbacks.forEach(cb => cb('SIGNED_IN', r.data));
+  return { data: r.data, error: null };
+}
+
+async function sbSignUp(email, password) {
+  const r = await sbAuth('signup', { email, password });
+  if (r.error) return { data: null, error: r.error };
+  if (r.data?.access_token) {
+    _currentSession = r.data;
+    localStorage.setItem('sb_session', JSON.stringify(r.data));
+    _authCallbacks.forEach(cb => cb('SIGNED_IN', r.data));
+  }
+  return { data: r.data, error: null };
+}
+
+async function sbSignOut() {
+  try {
+    await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Authorization': `Bearer ${_currentSession?.access_token}` }
+    });
+  } catch(e) {}
+  _currentSession = null;
+  localStorage.removeItem('sb_session');
+  _authCallbacks.forEach(cb => cb('SIGNED_OUT', null));
+}
+
+async function sbResetPassword(email) {
+  const r = await sbAuth('recover', { email, redirectTo: window.location.href });
+  return r;
+}
+
+async function sbUpdatePassword(newPassword) {
+  if (!_currentSession?.access_token) return { error: { message: 'Not logged in' } };
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT',
+      headers: { ...SB_HEADERS, 'Authorization': `Bearer ${_currentSession.access_token}` },
+      body: JSON.stringify({ password: newPassword })
+    });
+    const data = await res.json();
+    return { data, error: data.error ? data : null };
+  } catch(e) {
+    return { error: { message: e.message } };
+  }
+}
+
+function getAuthHeader() {
+  const token = _currentSession?.access_token || SUPABASE_KEY;
+  return { 'Authorization': `Bearer ${token}` };
+}
+
+async function sbFrom(table) {
+  return {
+    select: async (cols='*', opts={}) => {
+      let url = `${SUPABASE_URL}/rest/v1/${table}?select=${cols}`;
+      if (opts.filter) url += '&' + opts.filter;
+      if (opts.order) url += `&order=${opts.order}`;
+      try {
+        const res = await fetch(url, { headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': 'return=representation' } });
+        const data = await res.json();
+        return { data: Array.isArray(data) ? data : [], error: null };
+      } catch(e) { return { data: [], error: e }; }
+    },
+    insert: async (row) => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+          method: 'POST',
+          headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': 'return=representation' },
+          body: JSON.stringify(row)
+        });
+        const data = await res.json();
+        return { data: Array.isArray(data) ? data : [data], error: null };
+      } catch(e) { return { data: null, error: e }; }
+    },
+    upsert: async (row, opts={}) => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+          method: 'POST',
+          headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': `resolution=merge-duplicates,return=minimal` },
+          body: JSON.stringify(row)
+        });
+        return { data: null, error: null };
+      } catch(e) { return { data: null, error: e }; }
+    },
+    delete: async (filter) => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
+          method: 'DELETE',
+          headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': 'return=minimal' }
+        });
+        return { data: null, error: null };
+      } catch(e) { return { data: null, error: e }; }
+    }
+  };
+}
+
+// Fake sb object matching SDK interface used in the rest of the code
+const sb = {
+  auth: {
+    onAuthStateChange: (cb) => onAuthStateChange(cb),
+    signInWithPassword: ({ email, password }) => sbSignIn(email, password),
+    signUp: ({ email, password }) => sbSignUp(email, password),
+    signOut: () => sbSignOut(),
+    resetPasswordForEmail: (email, opts) => sbResetPassword(email),
+    updateUser: ({ password }) => sbUpdatePassword(password)
+  },
+  from: (table) => ({
+    select: (cols='*') => ({
+      eq: (col, val) => ({
+        single: async () => {
+          const url = `${SUPABASE_URL}/rest/v1/${table}?select=${cols}&${col}=eq.${encodeURIComponent(val)}`;
+          try {
+            const res = await fetch(url, { headers: { ...SB_HEADERS, ...getAuthHeader() } });
+            const data = await res.json();
+            const row = Array.isArray(data) ? data[0] : null;
+            return { data: row || null, error: row ? null : { message: 'Not found' } };
+          } catch(e) { return { data: null, error: e }; }
+        },
+        order: (col2) => ({
+          then: async (resolve) => {
+            const url = `${SUPABASE_URL}/rest/v1/${table}?select=${cols}&${col}=eq.${encodeURIComponent(val)}&order=${col2}`;
+            const res = await fetch(url, { headers: { ...SB_HEADERS, ...getAuthHeader() } });
+            const data = await res.json();
+            resolve({ data: Array.isArray(data)?data:[], error: null });
+          }
+        }),
+        then: async (resolve) => {
+          const url = `${SUPABASE_URL}/rest/v1/${table}?select=${cols}&${col}=eq.${encodeURIComponent(val)}`;
+          const res = await fetch(url, { headers: { ...SB_HEADERS, ...getAuthHeader() } });
+          const data = await res.json();
+          resolve({ data: Array.isArray(data)?data:[], error: null });
+        }
+      }),
+      order: (col2) => ({
+        then: async (resolve) => {
+          const url = `${SUPABASE_URL}/rest/v1/${table}?select=${cols}&order=${col2}`;
+          const res = await fetch(url, { headers: { ...SB_HEADERS, ...getAuthHeader() } });
+          const data = await res.json();
+          resolve({ data: Array.isArray(data)?data:[], error: null });
+        }
+      }),
+      then: async (resolve) => {
+        const url = `${SUPABASE_URL}/rest/v1/${table}?select=${cols}`;
+        const res = await fetch(url, { headers: { ...SB_HEADERS, ...getAuthHeader() } });
+        const data = await res.json();
+        resolve({ data: Array.isArray(data)?data:[], error: null });
+      }
+    }),
+    insert: (row) => ({
+      select: () => ({
+        single: async () => {
+          try {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+              method: 'POST',
+              headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': 'return=representation' },
+              body: JSON.stringify(row)
+            });
+            const data = await res.json();
+            const r = Array.isArray(data)?data[0]:data;
+            return { data: r, error: r?.code ? r : null };
+          } catch(e) { return { data: null, error: e }; }
+        }
+      }),
+      then: async (resolve) => {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+          method: 'POST',
+          headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': 'return=representation' },
+          body: JSON.stringify(row)
+        });
+        const data = await res.json();
+        resolve({ data: Array.isArray(data)?data:[], error: null });
+      }
+    }),
+    upsert: (row, opts={}) => ({
+      then: async (resolve) => {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+          method: 'POST',
+          headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(row)
+        });
+        resolve({ data: null, error: null });
+      }
+    }),
+    delete: () => ({
+      eq: (col, val) => ({
+        then: async (resolve) => {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${col}=eq.${val}`, {
+            method: 'DELETE',
+            headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': 'return=minimal' }
+          });
+          resolve({ data: null, error: null });
+        }
+      })
+    }),
+    update: (data) => ({
+      eq: (col, val) => ({
+        then: async (resolve) => {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${col}=eq.${val}`, {
+            method: 'PATCH',
+            headers: { ...SB_HEADERS, ...getAuthHeader(), 'Prefer': 'return=minimal' },
+            body: JSON.stringify(data)
+          });
+          resolve({ data: null, error: null });
+        }
+      })
+    })
+  })
+};
 
 // ===== MATCH DATA =====
 const TEAMS={1:"France",2:"Spain",3:"Argentina",4:"England",5:"Portugal",6:"Brazil",7:"Netherlands",8:"Morocco",9:"Belgium",10:"Germany",11:"Croatia",12:"Italy",13:"Colombia",14:"Senegal",15:"Mexico",16:"USA",17:"Uruguay",18:"Japan",19:"Switzerland",20:"Denmark",21:"IR Iran",22:"Turkey",23:"Ecuador",24:"Austria",25:"Rep. of Korea",26:"Nigeria",27:"Australia",28:"Algeria",29:"Egypt",30:"Canada",31:"Norway",32:"Ukraine",33:"Panama",34:"Ivory Coast",35:"Poland",36:"Russia",37:"Wales",38:"Sweden",39:"Serbia",40:"Paraguay",41:"Czech Rep.",42:"Hungary",43:"Scotland",44:"Tunisia",45:"Cameroon",46:"DR Congo",47:"Greece",48:"Slovakia",49:"Venezuela",50:"Uzbekistan",51:"Costa Rica",52:"Mali",53:"Peru",54:"Chile",55:"Qatar",56:"Romania",57:"Iraq",58:"Slovenia",60:"South Africa",61:"Saudi Arabia",62:"Burkina Faso",63:"Jordan",64:"Albania",65:"Bosnia/Herzeg.",66:"Honduras",69:"Cape Verde",70:"Northern Ireland",71:"Jamaica",72:"Georgia",73:"Finland",74:"Ghana",75:"Iceland",76:"Bolivia",77:"Israel",79:"Oman",81:"Montenegro",82:"Curaçao",83:"Haiti",85:"New Zealand",86:"Bulgaria"};
@@ -432,7 +684,7 @@ let saveTimers = {};
 let activePhaseFilter = 'Group Stage';
 
 // ===== SUPABASE AUTH LISTENERS =====
-sb.auth.onAuthStateChange(async (event, session) => {
+onAuthStateChange(async (event, session) => {
   if (event === 'PASSWORD_RECOVERY') {
     // User clicked reset link in email — open change password panel
     openAuth('password');
