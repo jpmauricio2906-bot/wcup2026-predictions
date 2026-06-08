@@ -439,13 +439,41 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 const SUPABASE_URL = 'https://bbcmrgsxxowjwcmgrilk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_7g8UYr7kQ1d9Lg0vafvC8A_UGGcwLZX';
 
-// Get valid auth token from Supabase SDK (handles refresh automatically)
+// Get valid auth token from saved session
 async function getAuthToken() {
   try {
-    const { data } = await sb.auth.getSession();
-    if (data?.session?.access_token) return data.session.access_token;
-  } catch(e) {}
-  return SUPABASE_KEY;
+    const saved = localStorage.getItem('wcup2026_session');
+    if (!saved) return SUPABASE_KEY;
+    const session = JSON.parse(saved);
+    if (!session?.access_token) return SUPABASE_KEY;
+
+    // Check expiry
+    const now = Math.floor(Date.now()/1000);
+    if (session.expires_at && now < session.expires_at - 60) {
+      return session.access_token;
+    }
+
+    // Token expired — try refresh
+    if (session.refresh_token) {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: session.refresh_token })
+      });
+      if (res.ok) {
+        const newSession = await res.json();
+        if (newSession?.access_token) {
+          localStorage.setItem('wcup2026_session', JSON.stringify(newSession));
+          // Update currentUser if needed
+          if (newSession.user) currentUser = newSession.user;
+          return newSession.access_token;
+        }
+      }
+    }
+    return session.access_token; // return even if expired, let server reject
+  } catch(e) {
+    return SUPABASE_KEY;
+  }
 }
 
 // Init Supabase client
@@ -520,24 +548,30 @@ let saveTimers = {};
 let activePhaseFilter = 'Group Stage';
 
 // ===== SUPABASE AUTH LISTENERS =====
+// Only use SDK listener for PASSWORD_RECOVERY (email reset links)
+// Session restore on refresh is handled manually in init()
 sb.auth.onAuthStateChange(async (event, session) => {
   if (event === 'PASSWORD_RECOVERY') {
-    // User clicked reset link in email — open change password panel
     openAuth('password');
     showToast('Enter your new password below', '');
     return;
   }
-  if (session?.user) {
-    currentUser = session.user;
+});
+
+// Manual session handler — called after login, signup, and on page load
+async function handleSession(user) {
+  if (user) {
+    currentUser = user;
     await loadProfile();
   } else {
     currentUser = null;
     currentProfile = null;
     myPredictions = {};
+    playerConfirmations = new Set();
   }
   updateAuthBar();
   renderMatches();
-});
+}
 
 // ===== AUTH ACTIONS =====
 async function doLogin() {
@@ -548,11 +582,16 @@ async function doLogin() {
   errEl.style.display = 'none';
   if (!email || !pass) { showErr(errEl, 'Please fill in both fields'); return; }
   btn.disabled = true; btn.textContent = 'Signing in…';
-  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
   btn.disabled = false; btn.textContent = 'Sign In →';
   if (error) { showErr(errEl, error.message); return; }
+  // Save session to localStorage for restore on refresh
+  if (data?.session) {
+    localStorage.setItem('wcup2026_session', JSON.stringify(data.session));
+  }
   closeModal();
   showToast('Welcome back! 👋', 'success');
+  await handleSession(data?.user);
 }
 
 async function doRegister() {
@@ -634,7 +673,8 @@ async function doChangePassword() {
 
 async function doSignOut() {
   await sb.auth.signOut();
-  playerConfirmations = new Set();
+  localStorage.removeItem('wcup2026_session');
+  await handleSession(null);
   showToast('Signed out', '');
 }
 
@@ -1338,30 +1378,28 @@ function showToast(msg,type=''){
 async function init() {
   setTheme(localStorage.getItem('wcup2026_theme')||'default');
 
-  // Load match results (public data, no auth needed)
+  // Load public match results (no auth needed)
   try {
-    const timeout = new Promise((_,reject)=>setTimeout(()=>reject('timeout'),5000));
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej('timeout'),5000));
     matchResults = await Promise.race([loadMatchResults(), timeout]);
-  } catch(e) {
-    matchResults = {};
-  }
+  } catch(e) { matchResults = {}; }
 
-  // Check if SDK already has a session (page refresh case)
-  // onAuthStateChange will fire automatically — but we wait briefly for it
+  // Restore session from localStorage (works on F5 refresh)
   try {
-    const { data } = await sb.auth.getSession();
-    if (data?.session?.user) {
-      // Session exists — onAuthStateChange will handle the rest
-      // Just render the loading state for now
-    } else {
-      // No session — render unauthenticated state immediately
-      try { refreshBracket(); } catch(e) {}
-      renderMatches();
+    const saved = localStorage.getItem('wcup2026_session');
+    if (saved) {
+      const session = JSON.parse(saved);
+      if (session?.user) {
+        // Valid saved session — restore it
+        await handleSession(session.user);
+        return; // handleSession calls renderMatches
+      }
     }
-  } catch(e) {
-    try { refreshBracket(); } catch(e2) {}
-    renderMatches();
-  }
+  } catch(e) {}
+
+  // No session — render unauthenticated
+  try { refreshBracket(); } catch(e) {}
+  renderMatches();
 }
 init();
 
