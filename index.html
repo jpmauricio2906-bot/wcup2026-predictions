@@ -172,28 +172,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .toast.success{border-color:var(--correct-border);}
 .toast.error{border-color:var(--wrong-border);}
 
-.loading{text-align:center;padding:60px;color:var(--text-muted);}
-.spinner{width:32px;height:32px;border:3px solid var(--card-border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* LOCKED STATE */
-.locked-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
-.locked-icon{font-size:52px;margin-bottom:16px;}
-.locked-title{font-size:18px;font-weight:700;color:var(--page-text);margin-bottom:8px;}
-.locked-sub{font-size:13px;margin-bottom:24px;}
-
-@media(max-width:600px){
-  .hero{padding:32px 16px 24px;}
-  .topbar{padding:10px 12px;}
-  .auth-bar{margin:10px 12px;}
-  .match-teams{grid-template-columns:1fr 90px 1fr;}
-  .team-name{font-size:12px;max-width:90px;}
-  .score-input{width:38px;height:36px;font-size:16px;}
-  .lb-row{grid-template-columns:40px 1fr 60px 60px;}
-  .lb-stat,.lb-exact{display:none;}
-  .pmgmt-row{grid-template-columns:1fr 80px;}
-}
-
 /* GROUP TABLES */
 .groups-view-toggle{display:flex;gap:0;margin:20px 0 24px;border:1px solid var(--card-border);border-radius:10px;overflow:hidden;max-width:400px;}
 .gvt-btn{flex:1;padding:10px 16px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .2s;}
@@ -216,13 +194,35 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .group-team{display:flex;align-items:center;gap:8px;}
 .group-flag{font-size:18px;line-height:1;}
 .group-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
-.pts-cell{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--page-text);}
+.pts-cell{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--page-text);font-weight:700;}
 .gd-pos{color:var(--correct-border);}.gd-neg{color:var(--wrong-border);}.gd-zero{color:var(--text-muted);}
 .qualified-bar{height:2px;background:var(--correct-border);margin:0 16px 0;}
 .third-bar{height:2px;background:var(--accent);margin:0 16px 12px;}
-.view-note{font-size:12px;color:var(--text-subtle);margin:0 0 20px;padding:10px 14px;background:var(--input-bg);border-radius:8px;border-left:3px solid var(--accent);}
 .groups-empty{text-align:center;padding:60px 20px;color:var(--text-muted);}
 .groups-empty-icon{font-size:48px;margin-bottom:16px;}
+.view-note{font-size:12px;color:var(--text-subtle);margin-bottom:20px;padding:10px 14px;background:var(--input-bg);border-radius:8px;border-left:3px solid var(--accent);}
+
+.loading{text-align:center;padding:60px;color:var(--text-muted);}
+.spinner{width:32px;height:32px;border:3px solid var(--card-border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* LOCKED STATE */
+.locked-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+.locked-icon{font-size:52px;margin-bottom:16px;}
+.locked-title{font-size:18px;font-weight:700;color:var(--page-text);margin-bottom:8px;}
+.locked-sub{font-size:13px;margin-bottom:24px;}
+
+@media(max-width:600px){
+  .hero{padding:32px 16px 24px;}
+  .topbar{padding:10px 12px;}
+  .auth-bar{margin:10px 12px;}
+  .match-teams{grid-template-columns:1fr 90px 1fr;}
+  .team-name{font-size:12px;max-width:90px;}
+  .score-input{width:38px;height:36px;font-size:16px;}
+  .lb-row{grid-template-columns:40px 1fr 60px 60px;}
+  .lb-stat,.lb-exact{display:none;}
+  .pmgmt-row{grid-template-columns:1fr 80px;}
+}
 </style>
 </head>
 <body>
@@ -275,7 +275,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 
 <!-- MAIN -->
 <div class="main">
-  <div class="section" id="section-groups"><div id="groupsContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div></div>
+  <div class="section" id="section-groups">
+    <div id="groupsContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
+  </div>
   <div class="section active" id="section-predictions">
     <div class="phase-filter" id="phaseFilter"></div>
     <div id="matchesContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
@@ -588,7 +590,7 @@ async function loadProfile() {
   }
   myPredictions = await loadMyPredictions();
   matchResults   = await loadMatchResults();
-  try{refreshBracket();}catch(e){}
+  refreshBracket();
   if (currentProfile?.is_admin) addAdminTab();
   else removeAdminTab();
 }
@@ -740,23 +742,26 @@ function matchCard(m) {
       </div>${actualDisplay}
     </div>`;
   } else {
-    const bkt = (_computedBracket[m.id]?.home ? _computedBracket[m.id] : _predictedBracket[m.id]) || {};
-    const hT=bkt.home, aT=bkt.away;
-    const hKN=hT?(TEAMS[hT]||'?'):'TBD', aKN=aT?(TEAMS[aT]||'?'):'TBD';
-    const hFK=hT?(FLAGS[hT]||'🏳️'):'🏴', aFK=aT?(FLAGS[aT]||'🏳️'):'🏴';
-    const kDis=(!hT||!aT||hasResult)?'disabled':'';
+    // Get computed bracket teams for this knockout match
+    const bkt = _computedBracket[m.id] || {};
+    const hTeam = bkt.home, aTeam = bkt.away;
+    const hKN = hTeam ? (TEAMS[hTeam]||'?') : 'TBD';
+    const aKN = aTeam ? (TEAMS[aTeam]||'?') : 'TBD';
+    const hFKN = hTeam ? (FLAGS[hTeam]||'🏳️') : '🏴';
+    const aFKN = aTeam ? (FLAGS[aTeam]||'🏳️') : '🏴';
+    const kDisabled = (!hTeam || !aTeam || hasResult) ? 'disabled' : '';
     return `<div class="${cls}" id="mc-${m.id}">
       <div class="match-meta"><span class="match-date">📅 ${dateStr}</span><span class="group-badge">${m.phase}</span></div>
       ${saveInd}${ptsBadge}
       <div class="match-label">${m.label||''}</div>
       <div class="match-teams">
-        <div class="team-side"><span class="team-flag">${hFK}</span><span class="team-name">${hKN}</span></div>
+        <div class="team-side"><span class="team-flag">${hFKN}</span><span class="team-name">${hKN}</span></div>
         <div class="score-area">
-          <input type="number" class="score-input" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${kDis}>
+          <input type="number" class="score-input" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${kDisabled}>
           <span class="score-sep">:</span>
-          <input type="number" class="score-input" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${kDis}>
+          <input type="number" class="score-input" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${kDisabled}>
         </div>
-        <div class="team-side away"><span class="team-flag">${aFK}</span><span class="team-name">${aKN}</span></div>
+        <div class="team-side away"><span class="team-flag">${aFKN}</span><span class="team-name">${aKN}</span></div>
       </div>${actualDisplay}
     </div>`;
   }
@@ -785,7 +790,6 @@ function onScore(matchId) {
     if(!error&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
     const cnt=Object.keys(myPredictions).length;
     document.getElementById('authPredCount').textContent=`${cnt} predictions saved`;
-    try{_predictedBracket=computeBracket(myPredictions);}catch(e){}
   },600);
 }
 
@@ -944,14 +948,14 @@ async function saveResult(matchId) {
   const a=parseInt(document.getElementById(`ra-${matchId}`).value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){showToast('Enter valid scores','error');return;}
   const {error}=await sb.from('match_results').upsert({match_id:matchId,home_score:h,away_score:a},{onConflict:'match_id'});
-  if(!error){matchResults[matchId]={home:h,away:a};try{refreshBracket();}catch(e){}showToast(`Result saved: ${h}–${a} ✓`,'success');renderAdmin();}
+  if(!error){matchResults[matchId]={home:h,away:a};refreshBracket();showToast(`Result saved: ${h}–${a} ✓`,'success');renderAdmin();}
   else showToast('Error saving result','error');
 }
 
 async function deleteResult(matchId) {
   if(!confirm('Remove this result?'))return;
   const {error}=await sb.from('match_results').delete().eq('match_id',matchId);
-  if(!error){delete matchResults[matchId];try{refreshBracket();}catch(e){}showToast('Result removed','');renderAdmin();}
+  if(!error){delete matchResults[matchId];refreshBracket();showToast('Result removed','');renderAdmin();}
 }
 
 // ===== AUTH MODAL =====
@@ -997,42 +1001,161 @@ async function init() {
   try {
     const timeout = new Promise((_,reject)=>setTimeout(()=>reject('timeout'),5000));
     matchResults = await Promise.race([loadMatchResults(), timeout]);
-  } catch(e) { matchResults = {}; }
+  } catch(e) {
+    matchResults = {};
+  }
+  try { refreshBracket(); } catch(e) { console.error('bracket init error',e); }
   renderMatches();
 }
 init();
 
-// ═══════════════════════════════════════════════════
-// MATCH DATA FOR STANDINGS
-// ═══════════════════════════════════════════════════
+
+// =====================================================
+// GROUPS TAB
+// =====================================================
+let _groupsView = 'real'; // 'real' or 'predicted'
+
+function renderGroups(view) {
+  _groupsView = view;
+  const container = document.getElementById('groupsContainer');
+  if (!container) return;
+
+  const groups = 'ABCDEFGHIJKL'.split('');
+
+  // Build standings for each group
+  const allStandings = {};
+  for (const grp of groups) {
+    allStandings[grp] = computeGroupStandingsForView(grp, view);
+  }
+
+  const hasAnyData = groups.some(g => allStandings[g].some(t => t.played > 0));
+
+  const toggleHtml = `
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px">🌍 Group Standings</div>
+        <div style="font-size:13px;color:var(--text-muted)">🟢 Qualified · 🟡 Best 3rd place contender · Eliminated</div>
+      </div>
+      <div class="groups-view-toggle">
+        <button class="gvt-btn${view==='real'?' active':''}" onclick="renderGroups('real')">📊 Real Results</button>
+        <button class="gvt-btn${view==='predicted'?' active':''}" onclick="renderGroups('predicted')">🔮 My Predictions</button>
+      </div>
+    </div>
+    <div class="view-note">
+      ${view==='real'
+        ? '📊 <strong>Real Results</strong> — standings based on actual match results entered by the admin.'
+        : '🔮 <strong>My Predictions</strong> — standings based on your predicted scores. Sign in to see your view.'}
+    </div>`;
+
+  if (!hasAnyData) {
+    container.innerHTML = toggleHtml + `
+      <div class="groups-empty">
+        <div class="groups-empty-icon">${view==='real'?'⏳':'🔮'}</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">${view==='real'?'No results yet':'No predictions yet'}</div>
+        <div style="font-size:13px">${view==='real'
+          ? 'The Admin will enter results as matches are played — check back after June 11.'
+          : 'Go to the Predictions tab and enter your scores to see your projected standings here.'}</div>
+      </div>`;
+    return;
+  }
+
+  const groupsHtml = `<div class="groups-grid">${groups.map(grp => renderGroupCard(grp, allStandings[grp])).join('')}</div>`;
+  container.innerHTML = toggleHtml + groupsHtml;
+}
+
+function computeGroupStandingsForView(group, view) {
+  const teams = GROUP_TEAMS[group];
+  const matchIds = GROUP_MATCHES[group];
+  const stats = {};
+  for (const t of teams) stats[t] = {pts:0,gf:0,ga:0,gd:0,w:0,d:0,l:0,played:0,teamId:t};
+
+  const source = view === 'real' ? matchResults : myPredictions;
+
+  for (const mid of matchIds) {
+    const r = source[mid];
+    const mt = GROUP_MATCH_TEAMS[mid];
+    if (!r || !mt) continue;
+    const {h, a} = mt;
+    const hs = view === 'real' ? r.home : r.home;
+    const as_ = view === 'real' ? r.away : r.away;
+    if (hs === undefined || as_ === undefined) continue;
+    stats[h].gf += hs; stats[h].ga += as_; stats[h].gd += hs-as_; stats[h].played++;
+    stats[a].gf += as_; stats[a].ga += hs; stats[a].gd += as_-hs; stats[a].played++;
+    if (hs > as_)       { stats[h].pts+=3; stats[h].w++; stats[a].l++; }
+    else if (hs === as_){ stats[h].pts+=1; stats[h].d++; stats[a].pts+=1; stats[a].d++; }
+    else                { stats[a].pts+=3; stats[a].w++; stats[h].l++; }
+  }
+
+  return Object.values(stats).sort((a,b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.gd  !== a.gd)  return b.gd  - a.gd;
+    if (b.gf  !== a.gf)  return b.gf  - a.gf;
+    return (FIFA_RANK[a.teamId]||99) - (FIFA_RANK[b.teamId]||99);
+  });
+}
+
+function renderGroupCard(group, standings) {
+  const hasData = standings.some(t => t.played > 0);
+  const gdClass = gd => gd > 0 ? 'gd-pos' : gd < 0 ? 'gd-neg' : 'gd-zero';
+  const gdStr = gd => gd > 0 ? `+${gd}` : `${gd}`;
+
+  const rows = standings.map((t, i) => {
+    const rowClass = i < 2 ? 'qualified' : i === 2 ? 'third' : '';
+    const flag = FLAGS[t.teamId] || '🏳️';
+    const name = TEAMS[t.teamId] || '?';
+    const pos = i === 0 ? '1' : i === 1 ? '2' : i === 2 ? '3' : '4';
+    return `<tr class="${rowClass}">
+      <td>${pos}</td>
+      <td><div class="group-team"><span class="group-flag">${flag}</span><span class="group-name">${name}</span></div></td>
+      <td>${t.played}</td>
+      <td>${t.w}</td>
+      <td>${t.d}</td>
+      <td>${t.l}</td>
+      <td>${t.gf}</td>
+      <td>${t.ga}</td>
+      <td class="${gdClass(t.gd)}">${hasData ? gdStr(t.gd) : '—'}</td>
+      <td><span class="pts-cell">${t.pts}</span></td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="group-card">
+    <div class="group-card-header">
+      <div class="group-card-title">Group ${group}</div>
+      <div class="group-card-sub">${standings.filter(t=>t.played>0).length > 0 ? standings.map(t=>t.played).reduce((a,b)=>a+b,0)/2 + '/6 matches played' : 'No results yet'}</div>
+    </div>
+    <table class="group-table">
+      <thead><tr>
+        <th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>PTS</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="qualified-bar"></div>
+    <div class="third-bar"></div>
+  </div>`;
+}
+
+
+// =====================================================
+// BRACKET ENGINE — Option C: Auto Tournament Progression
+// =====================================================
+
+// Group team rosters (teamId -> group, seed position in initial draw)
 const GROUP_TEAMS = {
-  A:[15,60,25,41], B:[30,65,55,19], C:[6,8,83,43],
-  D:[16,40,27,22], E:[10,82,34,23], F:[7,18,38,44],
-  G:[9,29,21,85],  H:[2,69,61,17],  I:[1,14,57,31],
-  J:[3,28,24,63],  K:[5,46,50,13],  L:[4,11,74,33]
-};
-const FIFA_RANK = {1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,11:11,13:13,14:14,15:15,16:16,17:17,18:18,19:19,21:21,22:22,23:23,24:24,25:25,27:27,28:28,29:29,30:30,31:31,33:33,34:34,38:38,40:40,41:41,43:43,44:44,46:46,50:50,55:55,57:57,60:60,61:61,63:63,65:65,69:69,74:74,82:82,83:83,85:85};
-const GROUP_MATCHES = {
-  A:[1,2,25,28,49,50], B:[3,8,26,27,51,52], C:[5,7,29,32,53,54],
-  D:[4,6,30,31,55,56], E:[9,10,33,36,57,58], F:[11,12,34,35,59,60],
-  G:[15,16,37,40,61,62], H:[13,14,38,39,63,64], I:[17,18,41,44,65,66],
-  J:[19,20,42,43,67,68], K:[23,24,45,48,69,70], L:[21,22,46,47,71,72]
-};
-const GROUP_MATCH_TEAMS = {
-  1:{h:15,a:60},2:{h:25,a:41},3:{h:30,a:65},4:{h:16,a:40},5:{h:83,a:43},6:{h:27,a:22},7:{h:6,a:8},8:{h:55,a:19},
-  9:{h:34,a:23},10:{h:10,a:82},11:{h:7,a:18},12:{h:38,a:44},13:{h:61,a:17},14:{h:2,a:69},15:{h:21,a:85},16:{h:9,a:29},
-  17:{h:1,a:14},18:{h:57,a:31},19:{h:3,a:28},20:{h:24,a:63},21:{h:74,a:33},22:{h:4,a:11},23:{h:5,a:46},24:{h:50,a:13},
-  25:{h:41,a:60},26:{h:19,a:65},27:{h:30,a:55},28:{h:15,a:25},29:{h:43,a:8},30:{h:22,a:16},31:{h:27,a:40},32:{h:6,a:83},
-  33:{h:82,a:23},34:{h:44,a:18},35:{h:7,a:38},36:{h:10,a:34},37:{h:29,a:85},38:{h:69,a:17},39:{h:2,a:61},40:{h:9,a:21},
-  41:{h:14,a:31},42:{h:28,a:63},43:{h:3,a:24},44:{h:1,a:57},45:{h:46,a:13},46:{h:11,a:33},47:{h:4,a:74},48:{h:5,a:50},
-  49:{h:15,a:41},50:{h:60,a:25},51:{h:30,a:19},52:{h:65,a:55},53:{h:6,a:43},54:{h:8,a:83},55:{h:16,a:27},56:{h:40,a:22},
-  57:{h:10,a:23},58:{h:82,a:34},59:{h:7,a:44},60:{h:18,a:38},61:{h:9,a:85},62:{h:29,a:21},63:{h:2,a:17},64:{h:69,a:61},
-  65:{h:1,a:31},66:{h:14,a:57},67:{h:3,a:63},68:{h:28,a:24},69:{h:5,a:13},70:{h:46,a:50},71:{h:4,a:33},72:{h:11,a:74}
+  A: [15,60,25,41], B: [30,65,55,19], C: [6,8,83,43],
+  D: [16,40,27,22], E: [10,82,34,23], F: [7,18,38,44],
+  G: [9,29,21,85],  H: [2,69,61,17],  I: [1,14,57,31],
+  J: [3,28,24,63],  K: [5,46,50,13],  L: [4,11,74,33]
 };
 
-// ═══════════════════════════════════════════════════
-// ASSIGN THIRD TABLE
-// ═══════════════════════════════════════════════════
+// FIFA ranking coefficients for tiebreaking (lower = better rank)
+const FIFA_RANK = {
+  1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,
+  11:11,13:13,14:14,15:15,16:16,17:17,18:18,19:19,21:21,22:22,
+  23:23,24:24,25:25,27:27,28:28,29:29,30:30,31:31,33:33,34:34,
+  38:38,40:40,41:41,43:43,44:44,46:46,50:50,55:55,57:57,60:60,
+  61:61,63:63,65:65,69:69,74:74,82:82,83:83,85:85
+};
+
 const ASSIGN_THIRD = {
   'EFGHIJKL': {'m79':'E','m85':'J','m81':'I','m74':'F','m82':'H','m77':'G','m87':'L','m80':'K'},
   'DFGHIJKL': {'m79':'H','m85':'G','m81':'I','m74':'D','m82':'J','m77':'F','m87':'L','m80':'K'},
@@ -1531,203 +1654,209 @@ const ASSIGN_THIRD = {
   'ABCDEFGH': {'m79':'H','m85':'G','m81':'B','m74':'C','m82':'A','m77':'F','m87':'D','m80':'E'},
 };
 
-// ═══════════════════════════════════════════════════
-// BRACKET ENGINE
-// ═══════════════════════════════════════════════════
-let _computedBracket  = {};
-let _predictedBracket = {};
+// Match IDs for each group's 6 matches
+const GROUP_MATCHES = {
+  A:[1,2,25,28,49,50], B:[3,8,26,27,51,52], C:[5,7,29,32,53,54],
+  D:[4,6,30,31,55,56], E:[9,10,33,36,57,58], F:[11,12,34,35,59,60],
+  G:[15,16,37,40,61,62], H:[13,14,38,39,63,64], I:[17,18,41,44,65,66],
+  J:[19,20,42,43,67,68], K:[23,24,45,48,69,70], L:[21,22,46,47,71,72]
+};
 
-function computeGroupStandingsFrom(group, results) {
+// For each group match, which team is home/away
+const GROUP_MATCH_TEAMS = {
+  1:{h:15,a:60}, 2:{h:25,a:41}, 3:{h:30,a:65}, 4:{h:16,a:40},
+  5:{h:83,a:43}, 6:{h:27,a:22}, 7:{h:6,a:8},   8:{h:55,a:19},
+  9:{h:34,a:23}, 10:{h:10,a:82},11:{h:7,a:18},  12:{h:38,a:44},
+  13:{h:61,a:17},14:{h:2,a:69}, 15:{h:21,a:85}, 16:{h:9,a:29},
+  17:{h:1,a:14}, 18:{h:57,a:31},19:{h:3,a:28},  20:{h:24,a:63},
+  21:{h:74,a:33},22:{h:4,a:11}, 23:{h:5,a:46},  24:{h:50,a:13},
+  25:{h:41,a:60},26:{h:19,a:65},27:{h:30,a:55}, 28:{h:15,a:25},
+  29:{h:43,a:8}, 30:{h:22,a:16},31:{h:27,a:40}, 32:{h:6,a:83},
+  33:{h:82,a:23},34:{h:44,a:18},35:{h:7,a:38},  36:{h:10,a:34},
+  37:{h:29,a:85},38:{h:69,a:17},39:{h:2,a:61},  40:{h:9,a:21},
+  41:{h:14,a:31},42:{h:28,a:63},43:{h:3,a:24},  44:{h:1,a:57},
+  45:{h:46,a:13},46:{h:11,a:33},47:{h:4,a:74},  48:{h:5,a:50},
+  49:{h:15,a:41},50:{h:60,a:25},51:{h:30,a:19}, 52:{h:65,a:55},
+  53:{h:6,a:43}, 54:{h:8,a:83}, 55:{h:16,a:27}, 56:{h:40,a:22},
+  57:{h:10,a:23},58:{h:82,a:34},59:{h:7,a:44},  60:{h:18,a:38},
+  61:{h:9,a:85}, 62:{h:29,a:21},63:{h:2,a:17},  64:{h:69,a:61},
+  65:{h:1,a:31}, 66:{h:14,a:57},67:{h:3,a:63},  68:{h:28,a:24},
+  69:{h:5,a:13}, 70:{h:46,a:50},71:{h:4,a:33},  72:{h:11,a:74}
+};
+
+// Compute group standings from entered results
+function computeGroupStandings(group, results) {
   const teams = GROUP_TEAMS[group];
   const matchIds = GROUP_MATCHES[group];
   const stats = {};
-  for (const t of teams) stats[t] = {pts:0,gf:0,ga:0,gd:0,w:0,d:0,l:0,played:0,teamId:t};
+  for (const t of teams) stats[t] = {pts:0,gf:0,ga:0,gd:0,w:0,d:0,l:0,teamId:t};
+
   for (const mid of matchIds) {
     const r = results[mid];
     const mt = GROUP_MATCH_TEAMS[mid];
     if (!r || !mt) continue;
-    const {h,a} = mt;
-    const hs = r.home, as_ = r.away;
-    if (hs===undefined||as_===undefined) continue;
-    stats[h].gf+=hs; stats[h].ga+=as_; stats[h].gd+=hs-as_; stats[h].played++;
-    stats[a].gf+=as_; stats[a].ga+=hs; stats[a].gd+=as_-hs; stats[a].played++;
-    if (hs>as_)        {stats[h].pts+=3;stats[h].w++;stats[a].l++;}
-    else if (hs===as_) {stats[h].pts+=1;stats[h].d++;stats[a].pts+=1;stats[a].d++;}
-    else               {stats[a].pts+=3;stats[a].w++;stats[h].l++;}
+    const {h, a} = mt;
+    const {home: hs, away: as_} = r;
+    stats[h].gf += hs; stats[h].ga += as_; stats[h].gd += hs - as_;
+    stats[a].gf += as_; stats[a].ga += hs; stats[a].gd += as_ - hs;
+    if (hs > as_)      { stats[h].pts+=3; stats[h].w++; stats[a].l++; }
+    else if (hs === as_){ stats[h].pts+=1; stats[h].d++; stats[a].pts+=1; stats[a].d++; }
+    else               { stats[a].pts+=3; stats[a].w++; stats[h].l++; }
   }
-  return Object.values(stats).sort((a,b)=>{
-    if(b.pts!==a.pts) return b.pts-a.pts;
-    if(b.gd !==a.gd)  return b.gd -a.gd;
-    if(b.gf !==a.gf)  return b.gf -a.gf;
-    return (FIFA_RANK[a.teamId]||99)-(FIFA_RANK[b.teamId]||99);
+
+  // Sort: pts > gd > gf > FIFA rank
+  return Object.values(stats).sort((a,b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.gd  !== a.gd)  return b.gd  - a.gd;
+    if (b.gf  !== a.gf)  return b.gf  - a.gf;
+    return (FIFA_RANK[a.teamId]||99) - (FIFA_RANK[b.teamId]||99);
   });
 }
 
+// Compute bracket: returns { teamId } for each match slot
 function computeBracket(results) {
-  const bracket = {};
-  const gs = {};
-  for (const grp of 'ABCDEFGHIJKL'.split('')) gs[grp] = computeGroupStandingsFrom(grp, results);
+  const bracket = {}; // matchId -> { home: teamId, away: teamId }
 
-  const thirds = 'ABCDEFGHIJKL'.split('').map(g=>({
-    group:g, teamId:gs[g][2]?.teamId,
-    pts:gs[g][2]?.pts||0, gd:gs[g][2]?.gd||0, gf:gs[g][2]?.gf||0,
-    rank:FIFA_RANK[gs[g][2]?.teamId]||99
-  })).filter(t=>t.teamId);
-  thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf||a.rank-b.rank);
-  const best8=thirds.slice(0,8);
-  const comboKey=best8.map(t=>t.group).sort().join('');
-  const slots=ASSIGN_THIRD[comboKey]||null;
-  const t3={};
-  for(const t of thirds) t3[t.group]=t.teamId;
-  const g1=g=>gs[g]?.[0]?.teamId||null;
-  const g2=g=>gs[g]?.[1]?.teamId||null;
-  const g3=g=>slots?(t3[slots['m'+{79:'79',85:'85',81:'81',74:'74',82:'82',77:'77',87:'87',80:'80'}[79]]||slots.m79]||null):null;
-  const get3=k=>slots?(t3[slots[k]]||null):null;
+  // Gate: only compute bracket if enough group results are in
+  // Each phase unlocks when all matches in the previous phase have results
+  const groupResultCount = Object.keys(results).filter(id => parseInt(id) <= 72).length;
+  const r32ResultCount   = Object.keys(results).filter(id => parseInt(id) >= 73 && parseInt(id) <= 88).length;
+  const r16ResultCount   = Object.keys(results).filter(id => parseInt(id) >= 89 && parseInt(id) <= 96).length;
+  const qfResultCount    = Object.keys(results).filter(id => parseInt(id) >= 97 && parseInt(id) <= 100).length;
+  const sfResultCount    = Object.keys(results).filter(id => parseInt(id) >= 101 && parseInt(id) <= 102).length;
 
-  // Round of 32
-  bracket[73]={home:g2('A'),away:g2('B')};
-  bracket[75]={home:g1('F'),away:g2('C')};
-  bracket[76]={home:g1('C'),away:g2('F')};
-  bracket[78]={home:g2('E'),away:g2('I')};
-  bracket[83]={home:g2('K'),away:g2('L')};
-  bracket[84]={home:g1('H'),away:g2('J')};
-  bracket[86]={home:g1('J'),away:g2('H')};
-  bracket[88]={home:g2('D'),away:g2('G')};
-  if(slots){
-    bracket[79]={home:g1('A'),away:get3('m79')};
-    bracket[85]={home:g1('B'),away:get3('m85')};
-    bracket[81]={home:g1('D'),away:get3('m81')};
-    bracket[74]={home:g1('E'),away:get3('m74')};
-    bracket[82]={home:g1('G'),away:get3('m82')};
-    bracket[77]={home:g1('I'),away:get3('m77')};
-    bracket[87]={home:g1('K'),away:get3('m87')};
-    bracket[80]={home:g1('L'),away:get3('m80')};
+  const groupComplete = groupResultCount >= 72;
+  const r32Complete   = r32ResultCount >= 16;
+  const r16Complete   = r16ResultCount >= 8;
+  const qfComplete    = qfResultCount >= 4;
+  const sfComplete    = sfResultCount >= 2;
+
+  if (!groupComplete) return {}; // No group stage done = no bracket yet
+
+  // Step 1: compute all group standings
+  const groupStandings = {};
+  for (const grp of 'ABCDEFGHIJKL'.split('')) {
+    groupStandings[grp] = computeGroupStandings(grp, results);
   }
 
-  // Winner/Loser helpers
-  const win=(mid)=>{
-    const r=results[mid],b=bracket[mid];
-    if(!r||!b) return null;
-    if(r.home>r.away) return b.home;
-    if(r.away>r.home) return b.away;
+  // Step 2: collect 3rd place teams from each group, ranked best to worst
+  const thirdPlaced = 'ABCDEFGHIJKL'.split('').map(grp => ({
+    group: grp,
+    teamId: groupStandings[grp][2]?.teamId,
+    pts: groupStandings[grp][2]?.pts || 0,
+    gd:  groupStandings[grp][2]?.gd  || 0,
+    gf:  groupStandings[grp][2]?.gf  || 0,
+    rank: FIFA_RANK[groupStandings[grp][2]?.teamId] || 99
+  })).filter(t => t.teamId);
+
+  // Sort 3rd placed: pts > gd > gf > FIFA rank
+  thirdPlaced.sort((a,b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.gd  !== a.gd)  return b.gd  - a.gd;
+    if (b.gf  !== a.gf)  return b.gf  - a.gf;
+    return a.rank - b.rank;
+  });
+
+  // Top 8 third placed teams
+  const best8 = thirdPlaced.slice(0, 8);
+
+  // Step 3: look up AssignThird table
+  // Key = sorted 8 group letters
+  const comboKey = best8.map(t => t.group).sort().join('');
+  const slots = ASSIGN_THIRD[comboKey] || null;
+
+  // Map group letter -> teamId for 3rd placed
+  const thirdByGroup = {};
+  for (const t of thirdPlaced) thirdByGroup[t.group] = t.teamId;
+
+  // Helper: get teamId of 3rd place from a group letter slot
+  const get3rd = (grpLetter) => grpLetter ? (thirdByGroup[grpLetter] || null) : null;
+  const get1st = (grp) => groupStandings[grp]?.[0]?.teamId || null;
+  const get2nd = (grp) => groupStandings[grp]?.[1]?.teamId || null;
+
+  // Step 4: populate Round of 32 (matches 73-88)
+  // Fixed matchups (no 3rd place)
+  bracket[73] = { home: get2nd('A'), away: get2nd('B') };
+  bracket[75] = { home: get1st('F'), away: get2nd('C') };
+  bracket[76] = { home: get1st('C'), away: get2nd('F') };
+  bracket[78] = { home: get2nd('E'), away: get2nd('I') };
+  bracket[83] = { home: get2nd('K'), away: get2nd('L') };
+  bracket[84] = { home: get1st('H'), away: get2nd('J') };
+  bracket[86] = { home: get1st('J'), away: get2nd('H') };
+  bracket[88] = { home: get2nd('D'), away: get2nd('G') };
+
+  // 3rd-place dependent matchups (use AssignThird table)
+  if (slots) {
+    bracket[79] = { home: get1st('A'), away: get3rd(slots.m79) };
+    bracket[85] = { home: get1st('B'), away: get3rd(slots.m85) };
+    bracket[81] = { home: get1st('D'), away: get3rd(slots.m81) };
+    bracket[74] = { home: get1st('E'), away: get3rd(slots.m74) };
+    bracket[82] = { home: get1st('G'), away: get3rd(slots.m82) };
+    bracket[77] = { home: get1st('I'), away: get3rd(slots.m77) };
+    bracket[87] = { home: get1st('K'), away: get3rd(slots.m87) };
+    bracket[80] = { home: get1st('L'), away: get3rd(slots.m80) };
+  }
+
+  // Step 5: populate later rounds — only when previous phase is complete
+  // Winner of match = team that scored more goals (from results)
+  const getWinner = (mid) => {
+    const r = results[mid];
+    const b = bracket[mid];
+    if (!r || !b) return null;
+    if (r.home > r.away) return b.home;
+    if (r.away > r.home) return b.away;
+    return null; // draw — no winner yet (knockout uses extra time/pens but we can't know)
+  };
+  const getLoser = (mid) => {
+    const r = results[mid];
+    const b = bracket[mid];
+    if (!r || !b) return null;
+    if (r.home > r.away) return b.away;
+    if (r.away > r.home) return b.home;
     return null;
   };
-  const lose=(mid)=>{
-    const r=results[mid],b=bracket[mid];
-    if(!r||!b) return null;
-    if(r.home>r.away) return b.away;
-    if(r.away>r.home) return b.home;
-    return null;
-  };
 
-  // Check R32 complete before populating R16
-  const r32Done=Object.keys(results).filter(id=>parseInt(id)>=73&&parseInt(id)<=88).length>=16;
-  if(!r32Done) return bracket;
+  // Round of 16 — only when all R32 results are in
+  if (!r32Complete) return bracket;
+  bracket[89] = { home: getWinner(74), away: getWinner(77) };
+  bracket[90] = { home: getWinner(73), away: getWinner(75) };
+  bracket[91] = { home: getWinner(76), away: getWinner(78) };
+  bracket[92] = { home: getWinner(79), away: getWinner(80) };
+  bracket[93] = { home: getWinner(83), away: getWinner(84) };
+  bracket[94] = { home: getWinner(81), away: getWinner(82) };
+  bracket[95] = { home: getWinner(86), away: getWinner(88) };
+  bracket[96] = { home: getWinner(85), away: getWinner(87) };
 
-  bracket[89]={home:win(74),away:win(77)};
-  bracket[90]={home:win(73),away:win(75)};
-  bracket[91]={home:win(76),away:win(78)};
-  bracket[92]={home:win(79),away:win(80)};
-  bracket[93]={home:win(83),away:win(84)};
-  bracket[94]={home:win(81),away:win(82)};
-  bracket[95]={home:win(86),away:win(88)};
-  bracket[96]={home:win(85),away:win(87)};
+  // Quarter-Finals — only when all R16 results are in
+  if (!r16Complete) return bracket;
+  bracket[97]  = { home: getWinner(89), away: getWinner(90) };
+  bracket[98]  = { home: getWinner(93), away: getWinner(94) };
+  bracket[99]  = { home: getWinner(91), away: getWinner(92) };
+  bracket[100] = { home: getWinner(95), away: getWinner(96) };
 
-  const r16Done=Object.keys(results).filter(id=>parseInt(id)>=89&&parseInt(id)<=96).length>=8;
-  if(!r16Done) return bracket;
+  // Semi-Finals — only when all QF results are in
+  if (!qfComplete) return bracket;
+  bracket[101] = { home: getWinner(97),  away: getWinner(98) };
+  bracket[102] = { home: getWinner(99),  away: getWinner(100) };
 
-  bracket[97]={home:win(89),away:win(90)};
-  bracket[98]={home:win(93),away:win(94)};
-  bracket[99]={home:win(91),away:win(92)};
-  bracket[100]={home:win(95),away:win(96)};
+  // Third Place + Final — only when both SF results are in
+  if (!sfComplete) return bracket;
+  bracket[103] = { home: getLoser(101), away: getLoser(102) };
+  bracket[104] = { home: getWinner(101), away: getWinner(102) };
 
-  const qfDone=Object.keys(results).filter(id=>parseInt(id)>=97&&parseInt(id)<=100).length>=4;
-  if(!qfDone) return bracket;
-
-  bracket[101]={home:win(97),away:win(98)};
-  bracket[102]={home:win(99),away:win(100)};
-
-  const sfDone=Object.keys(results).filter(id=>parseInt(id)>=101&&parseInt(id)<=102).length>=2;
-  if(!sfDone) return bracket;
-
-  bracket[103]={home:lose(101),away:lose(102)};
-  bracket[104]={home:win(101),away:win(102)};
   return bracket;
 }
 
+// Expose bracket globally so renderMatches can use it
+let _computedBracket = {};
+
 function refreshBracket() {
-  try { _computedBracket  = computeBracket(matchResults);  } catch(e){ _computedBracket={}; }
-  try { _predictedBracket = computeBracket(myPredictions); } catch(e){ _predictedBracket={}; }
-}
-
-// ═══════════════════════════════════════════════════
-// GROUPS TAB
-// ═══════════════════════════════════════════════════
-function renderGroups(view) {
-  const container = document.getElementById('groupsContainer');
-  if (!container) return;
-  const groups = 'ABCDEFGHIJKL'.split('');
-  const source = view==='real' ? matchResults : myPredictions;
-  const allStandings = {};
-  for (const g of groups) allStandings[g] = computeGroupStandingsFrom(g, source);
-  const hasData = groups.some(g=>allStandings[g].some(t=>t.played>0));
-
-  const toggle = `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
-    <div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px">🌍 Group Standings</div>
-      <div style="font-size:12px;color:var(--text-muted)">🟢 Qualified (Top 2) &nbsp;·&nbsp; 🟡 Best 3rd place contender</div>
-    </div>
-    <div class="groups-view-toggle">
-      <button class="gvt-btn${view==='real'?' active':''}" onclick="renderGroups('real')">📊 Real Results</button>
-      <button class="gvt-btn${view==='predicted'?' active':''}" onclick="renderGroups('predicted')">🔮 My Predictions</button>
-    </div>
-  </div>
-  <div class="view-note">${view==='real'
-    ? '📊 <strong>Real Results</strong> — standings from actual match results. Updates as the Admin enters scores.'
-    : '🔮 <strong>My Predictions</strong> — projected standings based on your predicted scores.'}</div>`;
-
-  if (!hasData) {
-    container.innerHTML = toggle + `<div class="groups-empty">
-      <div class="groups-empty-icon">${view==='real'?'⏳':'🔮'}</div>
-      <div style="font-size:16px;font-weight:600;margin-bottom:8px">${view==='real'?'No results entered yet':'No predictions yet'}</div>
-      <div style="font-size:13px">${view==='real'
-        ? 'Results will appear here after June 11 as matches are played.'
-        : currentProfile ? 'Go to Predictions and enter your scores.' : 'Sign in and add predictions to see your projected standings.'}</div>
-    </div>`;
-    return;
+  try {
+    _computedBracket = computeBracket(matchResults);
+  } catch(e) {
+    console.error('Bracket computation error:', e);
+    _computedBracket = {};
   }
-
-  const gdClass=gd=>gd>0?'gd-pos':gd<0?'gd-neg':'gd-zero';
-  const gdStr=gd=>gd>0?'+'+gd:''+gd;
-
-  const cards = groups.map(grp=>{
-    const rows = allStandings[grp].map((t,i)=>{
-      const cls = i<2?'qualified':i===2?'third':'';
-      return `<tr class="${cls}">
-        <td>${i+1}</td>
-        <td><div class="group-team"><span class="group-flag">${FLAGS[t.teamId]||'🏳️'}</span><span class="group-name">${TEAMS[t.teamId]||'?'}</span></div></td>
-        <td>${t.played}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
-        <td>${t.gf}</td><td>${t.ga}</td>
-        <td class="${gdClass(t.gd)}">${t.played>0?gdStr(t.gd):'—'}</td>
-        <td><span class="pts-cell">${t.pts}</span></td>
-      </tr>`;
-    }).join('');
-    const played = allStandings[grp].reduce((s,t)=>s+t.played,0)/2;
-    return `<div class="group-card">
-      <div class="group-card-header">
-        <div class="group-card-title">Group ${grp}</div>
-        <div class="group-card-sub">${played}/6 matches played</div>
-      </div>
-      <table class="group-table">
-        <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>PTS</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div class="qualified-bar"></div>
-      <div class="third-bar"></div>
-    </div>`;
-  }).join('');
-
-  container.innerHTML = toggle + `<div class="groups-grid">${cards}</div>`;
 }
 
 </script>
