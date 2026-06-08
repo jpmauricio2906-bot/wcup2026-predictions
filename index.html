@@ -439,32 +439,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 const SUPABASE_URL = 'https://bbcmrgsxxowjwcmgrilk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_7g8UYr7kQ1d9Lg0vafvC8A_UGGcwLZX';
 
-// Get valid auth token, refreshing if expired
+// Get valid auth token from Supabase SDK (handles refresh automatically)
 async function getAuthToken() {
-  if (!_currentSession) return SUPABASE_KEY;
-  const now = Math.floor(Date.now()/1000);
-  if (_currentSession.expires_at && now < _currentSession.expires_at - 60) {
-    return _currentSession.access_token;
-  }
-  // Refresh token
-  if (_currentSession.refresh_token) {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-        method:'POST',
-        headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
-        body:JSON.stringify({refresh_token:_currentSession.refresh_token})
-      });
-      if (r.ok) {
-        const d = await r.json();
-        if (d.access_token) {
-          _currentSession = d;
-          localStorage.setItem('wcup2026_session', JSON.stringify(d));
-          return d.access_token;
-        }
-      }
-    } catch(e) { console.warn('Token refresh failed',e); }
-  }
-  return _currentSession.access_token || SUPABASE_KEY;
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data?.session?.access_token) return data.session.access_token;
+  } catch(e) {}
+  return SUPABASE_KEY;
 }
 
 // Init Supabase client
@@ -1314,14 +1295,31 @@ function showToast(msg,type=''){
 // ===== INIT =====
 async function init() {
   setTheme(localStorage.getItem('wcup2026_theme')||'default');
+
+  // Load match results (public data, no auth needed)
   try {
     const timeout = new Promise((_,reject)=>setTimeout(()=>reject('timeout'),5000));
     matchResults = await Promise.race([loadMatchResults(), timeout]);
   } catch(e) {
     matchResults = {};
   }
-  try { refreshBracket(); } catch(e) { console.error('bracket init error',e); }
-  renderMatches();
+
+  // Check if SDK already has a session (page refresh case)
+  // onAuthStateChange will fire automatically — but we wait briefly for it
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data?.session?.user) {
+      // Session exists — onAuthStateChange will handle the rest
+      // Just render the loading state for now
+    } else {
+      // No session — render unauthenticated state immediately
+      try { refreshBracket(); } catch(e) {}
+      renderMatches();
+    }
+  } catch(e) {
+    try { refreshBracket(); } catch(e2) {}
+    renderMatches();
+  }
 }
 init();
 
@@ -2271,13 +2269,14 @@ async function confirmPhase(phaseKey) {
 async function adminUnlockPhase(playerId, playerName, phaseKey) {
   const phase = PHASES.find(p=>p.key===phaseKey);
   if (!confirm(`Unlock ${phase?.label} for ${playerName}? They will be able to edit those predictions again.`)) return;
+  const token = await getAuthToken();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/phase_confirmations?player_id=eq.${playerId}&phase=eq.${phaseKey}`,
     {
       method: 'DELETE',
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${_currentSession?.access_token||SUPABASE_KEY}`,
+        'Authorization': `Bearer ${token}`,
         'Prefer': 'return=minimal'
       }
     }
