@@ -2168,7 +2168,7 @@ function computeBracket(results, partial=false) {
   // Map group letter -> teamId for 3rd placed
   const thirdByGroup = {};
   for (const t of thirdPlaced) thirdByGroup[t.group] = t.teamId;
-  const get3rd = k => slots ? (thirdByGroup[slots[k]] || null) : null;
+  const get3rd = k => slots && thirdByGroup[slots[k]] ? thirdByGroup[slots[k]] : null;
 
   // Step 4: populate Round of 32 — matches exactly as labeled in MATCHES array
   // 73: 1A vs 2B  |  74: 1B vs 2A  |  75: 1C vs 2D  |  76: 1D vs 2C
@@ -2189,31 +2189,29 @@ function computeBracket(results, partial=false) {
   bracket[84] = { home: get1st('L'), away: get2nd('K') };
 
   // Matches 85-88: best 8 third-place teams, 2 per match
-  // Assign in ranked order: best vs 5th, 2nd vs 6th, 3rd vs 7th, 4th vs 8th
-  if (best8.length >= 2) {
-    bracket[85] = { home: best8[0]?.teamId||null, away: best8[4]?.teamId||null };
-  }
-  if (best8.length >= 4) {
-    bracket[86] = { home: best8[1]?.teamId||null, away: best8[5]?.teamId||null };
-  }
-  if (best8.length >= 6) {
-    bracket[87] = { home: best8[2]?.teamId||null, away: best8[6]?.teamId||null };
-  }
-  if (best8.length >= 8) {
-    bracket[88] = { home: best8[3]?.teamId||null, away: best8[7]?.teamId||null };
-  }
+  // When slots lookup works (all 12 groups), use proper assignment
+  // When partial, just pair best available 3rds in ranked order
+  const t = (i) => thirdPlaced[i]?.teamId || null;
+  bracket[85] = { home: t(0), away: t(4) };
+  bracket[86] = { home: t(1), away: t(5) };
+  bracket[87] = { home: t(2), away: t(6) };
+  bracket[88] = { home: t(3), away: t(7) };
 
   // Step 5: populate later rounds — only when previous phase is complete
   // Winner of match = team that scored more goals (from results)
   const getWinner = (mid) => {
     const r = results[mid], b = bracket[mid];
     if (!r || !b) return null;
+    // If one side is null (group not yet predicted), return the known side
+    if (!b.home && b.away) return b.away;
+    if (!b.away && b.home) return b.home;
     const w = getMatchWinner(r, true); // true = isKnockout
     return w === 'home' ? b.home : w === 'away' ? b.away : null;
   };
   const getLoser = (mid) => {
     const r = results[mid], b = bracket[mid];
     if (!r || !b) return null;
+    if (!b.home || !b.away) return null; // can't determine loser if teams unknown
     const w = getMatchWinner(r, true);
     return w === 'home' ? b.away : w === 'away' ? b.home : null;
   };
