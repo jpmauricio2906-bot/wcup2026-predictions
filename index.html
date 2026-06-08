@@ -936,6 +936,9 @@ async function doChangePassword() {
 }
 
 async function doSignOut() {
+  // Before signing out, let any pending prediction/penalty saves finish so a
+  // quick logout cannot drop newly-entered shootout picks.
+  try { await flushPendingPredictionSaves(); } catch(e) { console.warn('Pending save flush before sign-out failed:', e); }
   await sb.auth.signOut();
   AUTH_STORAGE.removeItem(AUTH_SESSION_KEY);
   AUTH_STORAGE.removeItem(SUPABASE_AUTH_STORAGE_KEY);
@@ -1339,6 +1342,58 @@ function matchCard(m) {
 
 function filterPhase(p){ activePhaseFilter=p; renderMatches(); }
 
+async function persistPrediction(matchId) {
+  if (!currentUser || !myPredictions[matchId]) return false;
+  const pred = myPredictions[matchId];
+  const payload = {
+    player_id: currentUser.id,
+    match_id: matchId,
+    home_score: pred.home,
+    away_score: pred.away
+  };
+
+  if (matchId >= 73) {
+    const isTie = pred.home === pred.away;
+    const hasValidPens = pred.home_pen != null && pred.away_pen != null && pred.home_pen !== pred.away_pen;
+
+    if (isTie && hasValidPens) {
+      // For tied knockout predictions, only write penalty fields when we have
+      // a complete winner. This avoids overwriting saved penalties with NULL.
+      payload.home_pen = pred.home_pen;
+      payload.away_pen = pred.away_pen;
+    } else if (!isTie) {
+      // Regulation winner: penalties are no longer relevant, so clear them.
+      payload.home_pen = null;
+      payload.away_pen = null;
+    }
+    // If tied but penalties are incomplete, intentionally omit home_pen/away_pen.
+    // PostgREST upsert then cannot null out previously saved penalties.
+  }
+
+  const token = await getAuthToken();
+  const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify(payload)
+  });
+  if (!upsertRes.ok) {
+    console.error('Prediction save failed:', matchId, await upsertRes.text());
+    return false;
+  }
+  return true;
+}
+
+async function flushPendingPredictionSaves(matchIds=null) {
+  // Cancel queued debounced saves and immediately persist the current local state.
+  const ids = matchIds || Object.keys(myPredictions).map(Number);
+  for (const key of Object.keys(saveTimers)) {
+    clearTimeout(saveTimers[key]);
+    delete saveTimers[key];
+  }
+  const toSave = ids.filter(id => myPredictions[id] !== undefined);
+  await Promise.all(toSave.map(id => persistPrediction(id)));
+}
+
 async function onPenScore(matchId) {
   if (!currentUser) return;
   const hp = parseInt(document.getElementById(`hp-${matchId}`)?.value);
@@ -1347,16 +1402,17 @@ async function onPenScore(matchId) {
   if (!myPredictions[matchId]) return;
   myPredictions[matchId].home_pen = hp;
   myPredictions[matchId].away_pen = ap;
+
   clearTimeout(saveTimers[`pen-${matchId}`]);
-  saveTimers[`pen-${matchId}`] = setTimeout(async()=>{
-    const penToken = await getAuthToken();
-    await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
-      method:'POST',
-      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${penToken}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({player_id:currentUser.id,match_id:matchId,home_score:myPredictions[matchId].home,away_score:myPredictions[matchId].away,home_pen:hp,away_pen:ap})
-    });
+  // Save valid penalty winners immediately. This is important because a user can
+  // confirm/lock a phase or sign out before a delayed timer fires.
+  const ok = await persistPrediction(matchId);
+  if (ok) {
     try{_predictedBracket=computeBracket(myPredictions,true);}catch(e){}
-  }, 600);
+    showToast('Penalty winner saved ✓','success');
+  } else {
+    showToast('Error saving penalty winner','error');
+  }
 }
 
 function onScore(matchId) {
@@ -1369,8 +1425,7 @@ function onScore(matchId) {
   const oldPred = myPredictions[matchId] || {};
   // Preserve existing penalty predictions in local state while the user edits a
   // knockout score. Do not wipe penalties just because an intermediate keystroke
-  // temporarily makes the regulation score non-tied; only the database payload
-  // below decides whether penalties should be stored or cleared.
+  // temporarily makes the regulation score non-tied.
   myPredictions[matchId] = {
     home: hi,
     away: ai,
@@ -1384,25 +1439,12 @@ function onScore(matchId) {
   else if(card){ card.insertAdjacentHTML('beforeend',`<div class="save-ind" id="ind-${matchId}"><span class="dot-saving"></span>Saving…</div>`); ind=card.querySelector('.save-ind'); }
   clearTimeout(saveTimers[matchId]);
   saveTimers[matchId]=setTimeout(async()=>{
-    const penData = matchId >= 73 ? {
-      // Store penalties only when regulation is tied. For non-tied scores,
-      // clear DB penalties, but keep them in local state so quick edits from
-      // tie -> non-tie -> tie do not accidentally lose the shootout pick.
-      home_pen: hi === ai ? (myPredictions[matchId]?.home_pen ?? null) : null,
-      away_pen: hi === ai ? (myPredictions[matchId]?.away_pen ?? null) : null
-    } : {};
-    const token = await getAuthToken();
-    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
-      method:'POST',
-      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({player_id:currentUser.id,match_id:matchId,home_score:hi,away_score:ai,...penData})
-    });
-    const error = upsertRes.ok ? null : {message: await upsertRes.text()};
-    if(!error&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
+    const ok = await persistPrediction(matchId);
+    if(ok&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
     const cnt=Object.keys(myPredictions).length;
     document.getElementById('authPredCount').textContent=`${cnt} predictions saved`;
     try{_predictedBracket=computeBracket(myPredictions,true);}catch(e){}
-    // Re-render to update confirm button
+    // Re-render to update confirm button and penalty enablement.
     renderMatches();
   },600);
 }
@@ -2758,6 +2800,17 @@ async function confirmPhase(phaseKey) {
   }
   if (!confirm(`Confirm your ${phase.label} predictions? They will be locked and cannot be changed.`)) return;
 
+  // Persist the whole phase before locking. This prevents a valid penalty winner
+  // from existing only in local state while the database still has NULL.
+  try {
+    await flushPendingPredictionSaves(phase.matchIds);
+    myPredictions = await loadMyPredictions();
+  } catch(e) {
+    console.error('Phase save flush failed before confirmation:', e);
+    showToast('Could not verify all predictions were saved. Please try again.', 'error');
+    return;
+  }
+
   // Optimistically update UI immediately — don't wait for network
   playerConfirmations.add(phaseKey);
   try { _predictedBracket = computeBracket(myPredictions, true); } catch(e) {}
@@ -2814,6 +2867,10 @@ async function adminUnlockPhase(playerId, playerName, phaseKey) {
     // local lock state without re-saving any predictions.
     if (currentUser && playerId === currentUser.id) {
       await loadConfirmations();
+      // Reload predictions after unlock so the UI reflects the database state,
+      // including preserved penalty scores. Unlocking itself never edits predictions.
+      myPredictions = await loadMyPredictions();
+      try{_predictedBracket=computeBracket(myPredictions,true);}catch(e){}
       renderMatches();
       if (document.getElementById('section-bracket')?.classList.contains('active')) renderBracket(_bracketView);
     }
