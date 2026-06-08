@@ -1861,41 +1861,43 @@ function computeBracket(results) {
     groupStandings[grp] = computeGroupStandings(grp, results);
   }
 
-  // Step 2: collect 3rd place teams from each group, ranked best to worst
-  const thirdPlaced = 'ABCDEFGHIJKL'.split('').map(grp => ({
-    group: grp,
-    teamId: groupStandings[grp][2]?.teamId,
-    pts: groupStandings[grp][2]?.pts || 0,
-    gd:  groupStandings[grp][2]?.gd  || 0,
-    gf:  groupStandings[grp][2]?.gf  || 0,
-    rank: FIFA_RANK[groupStandings[grp][2]?.teamId] || 99
-  })).filter(t => t.teamId);
+  // Only consider groups that have at least 1 result/prediction
+  const grpHasRes = g => Object.keys(results).some(id => GROUP_MATCHES[g]?.includes(parseInt(id)));
+
+  // Helpers — return null if group has no results yet
+  const get1st = g => grpHasRes(g) ? (groupStandings[g]?.[0]?.teamId || null) : null;
+  const get2nd = g => grpHasRes(g) ? (groupStandings[g]?.[1]?.teamId || null) : null;
+
+  // Step 2: collect 3rd place teams ONLY from groups with results
+  const thirdPlaced = 'ABCDEFGHIJKL'.split('')
+    .filter(grp => grpHasRes(grp))
+    .map(grp => ({
+      group: grp,
+      teamId: groupStandings[grp][2]?.teamId,
+      pts:  groupStandings[grp][2]?.pts  || 0,
+      gd:   groupStandings[grp][2]?.gd   || 0,
+      gf:   groupStandings[grp][2]?.gf   || 0,
+      rank: FIFA_RANK[groupStandings[grp][2]?.teamId] || 99
+    })).filter(t => t.teamId);
 
   // Sort 3rd placed: pts > gd > gf > FIFA rank
-  thirdPlaced.sort((a,b) => {
-    if (b.pts !== a.pts) return b.pts - a.pts;
-    if (b.gd  !== a.gd)  return b.gd  - a.gd;
-    if (b.gf  !== a.gf)  return b.gf  - a.gf;
-    return a.rank - b.rank;
-  });
+  thirdPlaced.sort((a,b) =>
+    b.pts-a.pts || b.gd-a.gd || b.gf-a.gf || a.rank-b.rank
+  );
 
-  // Top 8 third placed teams
-  const best8 = thirdPlaced.slice(0, 8);
+  // Top 8 third placed teams — need exactly 8 groups with results to look up slots
+  const best8  = thirdPlaced.slice(0, 8);
+  const groupsWithResults = 'ABCDEFGHIJKL'.split('').filter(grpHasRes);
 
-  // Step 3: look up AssignThird table
-  // Key = sorted 8 group letters
-  const comboKey = best8.map(t => t.group).sort().join('');
-  const slots = ASSIGN_THIRD[comboKey] || null;
+  // Only look up AssignThird when all 12 groups have results (full group stage done)
+  const comboKey = groupsWithResults.length === 12
+    ? best8.map(t => t.group).sort().join('') : '';
+  const slots = comboKey ? (ASSIGN_THIRD[comboKey] || null) : null;
 
   // Map group letter -> teamId for 3rd placed
   const thirdByGroup = {};
   for (const t of thirdPlaced) thirdByGroup[t.group] = t.teamId;
-
-  // Helper: get teamId of 3rd place from a group letter slot
-  const get3rd = (grpLetter) => grpLetter ? (thirdByGroup[grpLetter] || null) : null;
-  const grpHasRes = g => Object.keys(results).some(id=>GROUP_MATCHES[g]?.includes(parseInt(id)));
-  const get1st = g => grpHasRes(g) ? (groupStandings[g]?.[0]?.teamId||null) : null;
-  const get2nd = g => grpHasRes(g) ? (groupStandings[g]?.[1]?.teamId||null) : null;
+  const get3rd = k => slots ? (thirdByGroup[slots[k]] || null) : null;
 
   // Step 4: populate Round of 32 (matches 73-88)
   // Fixed matchups (no 3rd place)
