@@ -777,8 +777,9 @@ function matchCard(m) {
     hPredTeam = hOffTeam = m.home;
     aPredTeam = aOffTeam = m.away;
   } else {
-    const bPred = visible ? (_predictedBracket[m.id]||{}) : {};
-    const bOff  = _computedBracket[m.id] || {};
+    // Always show predicted teams — let player see projected matchups
+    const bPred = _predictedBracket[m.id] || {};
+    const bOff  = _computedBracket[m.id]  || {};
     hPredTeam = bPred.home || null;
     aPredTeam = bPred.away || null;
     hOffTeam  = bOff.home  || null;
@@ -796,9 +797,9 @@ function matchCard(m) {
 
   let predRowContent;
   if (!visible && !m.group) {
-    // Phase not yet unlocked — show locked message
+    // No predictions in previous phase yet — nothing to project
     predRowContent = `<div style="flex:1;font-size:12px;color:var(--text-subtle);font-style:italic">
-      🔒 Complete & confirm previous phase to unlock
+      Fill in previous phase predictions to see projected matchups
     </div>`;
   } else {
     predRowContent = `
@@ -2033,7 +2034,8 @@ async function confirmPhase(phaseKey) {
   });
   if (res.ok || res.status===201 || res.status===204) {
     playerConfirmations.add(phaseKey);
-    try{_predictedBracket=computeBracket(myPredictions);}catch(e){}
+    try { _predictedBracket = computeBracket(myPredictions); } catch(e) {}
+    try { _computedBracket  = computeBracket(matchResults);  } catch(e) {}
     showToast(`${phase.label} predictions confirmed! ✓`, 'success');
     renderMatches();
   } else {
@@ -2080,12 +2082,16 @@ function isPhaseEditable(phaseKey) {
   return playerConfirmations.has(prevKey); // previous phase must be confirmed
 }
 
-// Is a phase visible (can see teams) for predictions?
-// A phase is visible if the previous phase is confirmed
+// Is a phase visible (teams shown in preview)?
+// Next phase is ALWAYS visible as soon as previous phase has any predictions.
+// This lets players see projected matchups and think ahead while filling in.
 function isPhaseVisible(phaseKey) {
   const idx = PHASE_ORDER.indexOf(phaseKey);
   if (idx === 0) return true;
-  return playerConfirmations.has(PHASE_ORDER[idx-1]);
+  // Show teams if previous phase has at least 1 prediction filled
+  const prevPhase = PHASES[idx-1];
+  if (!prevPhase) return false;
+  return prevPhase.matchIds.some(id => myPredictions[id] !== undefined);
 }
 
 // Count predictions filled for a phase
