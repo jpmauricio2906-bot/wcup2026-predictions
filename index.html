@@ -1367,11 +1367,15 @@ function onScore(matchId) {
   const hi=parseInt(h), ai=parseInt(a);
   if(isNaN(hi)||isNaN(ai)||hi<0||ai<0) return;
   const oldPred = myPredictions[matchId] || {};
+  // Preserve existing penalty predictions in local state while the user edits a
+  // knockout score. Do not wipe penalties just because an intermediate keystroke
+  // temporarily makes the regulation score non-tied; only the database payload
+  // below decides whether penalties should be stored or cleared.
   myPredictions[matchId] = {
     home: hi,
     away: ai,
-    home_pen: (matchId >= 73 && hi === ai) ? (oldPred.home_pen ?? null) : null,
-    away_pen: (matchId >= 73 && hi === ai) ? (oldPred.away_pen ?? null) : null
+    home_pen: matchId >= 73 ? (oldPred.home_pen ?? null) : null,
+    away_pen: matchId >= 73 ? (oldPred.away_pen ?? null) : null
   };
   const card=document.getElementById(`mc-${matchId}`);
   if(card&&!card.classList.contains('has-prediction')) card.classList.add('has-prediction');
@@ -1381,8 +1385,11 @@ function onScore(matchId) {
   clearTimeout(saveTimers[matchId]);
   saveTimers[matchId]=setTimeout(async()=>{
     const penData = matchId >= 73 ? {
-      home_pen: myPredictions[matchId]?.home_pen ?? null,
-      away_pen: myPredictions[matchId]?.away_pen ?? null
+      // Store penalties only when regulation is tied. For non-tied scores,
+      // clear DB penalties, but keep them in local state so quick edits from
+      // tie -> non-tie -> tie do not accidentally lose the shootout pick.
+      home_pen: hi === ai ? (myPredictions[matchId]?.home_pen ?? null) : null,
+      away_pen: hi === ai ? (myPredictions[matchId]?.away_pen ?? null) : null
     } : {};
     const token = await getAuthToken();
     const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
@@ -2802,6 +2809,14 @@ async function adminUnlockPhase(playerId, playerName, phaseKey) {
   );
   if (res.ok || res.status===204) {
     showToast(`${phase?.label} unlocked for ${playerName} ✓`, 'success');
+    // Unlocking must only remove the phase lock. It must not touch predictions
+    // or penalty fields. If the admin is unlocking their own phase, refresh the
+    // local lock state without re-saving any predictions.
+    if (currentUser && playerId === currentUser.id) {
+      await loadConfirmations();
+      renderMatches();
+      if (document.getElementById('section-bracket')?.classList.contains('active')) renderBracket(_bracketView);
+    }
   } else {
     showToast('Error unlocking phase', 'error');
   }
