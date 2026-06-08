@@ -1568,20 +1568,24 @@ function computeBracket(results) {
   const gs = {};
   for (const grp of 'ABCDEFGHIJKL'.split('')) gs[grp] = computeGroupStandingsFrom(grp, results);
 
+  // Only consider groups that have at least 1 result played
+  const groupHasResults = g => gs[g].some(t => t.played > 0);
+
   const thirds = 'ABCDEFGHIJKL'.split('').map(g=>({
     group:g, teamId:gs[g][2]?.teamId,
     pts:gs[g][2]?.pts||0, gd:gs[g][2]?.gd||0, gf:gs[g][2]?.gf||0,
-    rank:FIFA_RANK[gs[g][2]?.teamId]||99
-  })).filter(t=>t.teamId);
+    rank:FIFA_RANK[gs[g][2]?.teamId]||99,
+    hasResults: groupHasResults(g)
+  })).filter(t=>t.teamId && t.hasResults);
   thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf||a.rank-b.rank);
   const best8=thirds.slice(0,8);
   const comboKey=best8.map(t=>t.group).sort().join('');
   const slots=ASSIGN_THIRD[comboKey]||null;
   const t3={};
   for(const t of thirds) t3[t.group]=t.teamId;
-  const g1=g=>gs[g]?.[0]?.teamId||null;
-  const g2=g=>gs[g]?.[1]?.teamId||null;
-  const g3=g=>slots?(t3[slots['m'+{79:'79',85:'85',81:'81',74:'74',82:'82',77:'77',87:'87',80:'80'}[79]]||slots.m79]||null):null;
+  // Only return team if that group has actual results
+  const g1=g=>groupHasResults(g)?(gs[g]?.[0]?.teamId||null):null;
+  const g2=g=>groupHasResults(g)?(gs[g]?.[1]?.teamId||null):null;
   const get3=k=>slots?(t3[slots[k]]||null):null;
 
   // Round of 32
