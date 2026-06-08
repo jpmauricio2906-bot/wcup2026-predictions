@@ -223,6 +223,36 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
   .lb-stat,.lb-exact{display:none;}
   .pmgmt-row{grid-template-columns:1fr 80px;}
 }
+
+/* DUAL ROW MATCH CARDS */
+.match-row{display:flex;align-items:center;gap:8px;padding:8px 14px;}
+.match-row-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;min-width:72px;flex-shrink:0;}
+.row-prediction .match-row-label{color:var(--accent);}
+.row-official .match-row-label{color:var(--correct-border);}
+.row-official{background:rgba(46,204,113,0.04);border-top:1px solid var(--card-border);}
+.row-tbd .match-row-label{color:var(--text-subtle);}
+.row-tbd{background:transparent;border-top:1px solid var(--card-border);}
+.match-row .team-side{flex:1;}
+.match-row .score-area{flex-shrink:0;}
+.score-static{width:44px;height:36px;background:var(--input-bg);border:1px solid var(--card-border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--text-muted);}
+.score-official{border-color:var(--correct-border);color:var(--correct-border);background:var(--correct-bg);}
+.match-card-v2{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);overflow:hidden;transition:box-shadow .2s;position:relative;}
+.match-card-v2:hover{box-shadow:var(--shadow);}
+.match-card-v2.has-prediction{border-left:3px solid var(--accent);}
+.match-card-v2.has-result{border-left:3px solid var(--correct-border);}
+.match-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 0;}
+.pts-badge-v2{font-family:'Bebas Neue',sans-serif;font-size:13px;padding:2px 8px;border-radius:6px;}
+.pending-label{font-size:10px;color:var(--text-subtle);font-style:italic;}
+/* Keep old score-input styles for prediction row */
+.score-input-pred{width:44px;height:36px;background:var(--input-bg);border:1px solid var(--input-border);color:var(--page-text);border-radius:8px;text-align:center;font-size:18px;font-weight:700;font-family:'Bebas Neue',sans-serif;outline:none;transition:all .2s;-moz-appearance:textfield;}
+.score-input-pred::-webkit-inner-spin-button,.score-input-pred::-webkit-outer-spin-button{-webkit-appearance:none;}
+.score-input-pred:focus{border-color:var(--accent);background:var(--accent-bg);}
+.score-input-pred:disabled{opacity:.5;cursor:not-allowed;}
+@media(max-width:600px){
+  .match-row-label{min-width:56px;font-size:9px;}
+  .score-input-pred,.score-static{width:36px;height:32px;font-size:15px;}
+  .match-row .team-name{font-size:11px;max-width:80px;}
+}
 </style>
 </head>
 <body>
@@ -713,58 +743,141 @@ function renderMatches() {
 }
 
 function matchCard(m) {
-  const pred=myPredictions[m.id], result=matchResults[m.id];
-  const hasPred=pred!==undefined, hasResult=result!==undefined;
-  const pts=hasPred&&hasResult?calcPts(pred,result):null;
-  let cls='match-card';
-  if(hasPred) cls+=' has-prediction';
-  if(hasResult) cls+=' has-result';
-  const hv=hasPred?pred.home:'', av=hasPred?pred.away:'';
-  const dateStr=new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short'});
-  const ptsBadge=pts!==null?`<div class="pts-badge pts-${pts}">${pts} PT${pts!==1?'S':'S'}</div>`:'';
-  const saveInd=hasPred?`<div class="save-ind"><span class="dot-saved"></span>Saved</div>`:'';
-  const actualDisplay=hasResult?`<div class="actual-result"><span class="actual-label">Result:</span><span class="actual-score">${result.home}–${result.away}</span></div>`:'';
-  const disabled=hasResult?'disabled':'';
+  const pred    = myPredictions[m.id];
+  const result  = matchResults[m.id];
+  const hasPred  = pred !== undefined;
+  const hasResult = result !== undefined;
+  const pts = hasPred && hasResult ? calcPts(pred, result) : null;
 
-  if(m.group){
-    const hN=TEAMS[m.home]||'?',hF=FLAGS[m.home]||'🏳️',aN=TEAMS[m.away]||'?',aF=FLAGS[m.away]||'🏳️';
-    return `<div class="${cls}" id="mc-${m.id}">
-      <div class="match-meta"><span class="match-date">📅 ${dateStr} · ${m.time}</span><span class="group-badge">Group ${m.group}</span></div>
-      ${saveInd}${ptsBadge}
-      <div class="match-teams">
-        <div class="team-side"><span class="team-flag">${hF}</span><span class="team-name">${hN}</span></div>
-        <div class="score-area">
-          <input type="number" class="score-input" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${disabled}>
-          <span class="score-sep">:</span>
-          <input type="number" class="score-input" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${disabled}>
-        </div>
-        <div class="team-side away"><span class="team-flag">${aF}</span><span class="team-name">${aN}</span></div>
-      </div>${actualDisplay}
+  // Points badge
+  const ptsHtml = pts !== null
+    ? `<span class="pts-badge-v2 pts-${pts}">${pts} PT${pts!==1?'S':'S'}</span>`
+    : '';
+
+  // Card border class
+  let cls = 'match-card-v2';
+  if (hasPred)   cls += ' has-prediction';
+  if (hasResult) cls += ' has-result';
+
+  const dateStr = new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short'});
+
+  // ── TEAMS ──
+  // For group matches: fixed teams. For knockout: from brackets.
+  let hTeam, aTeam, hPredTeam, aPredTeam;
+  let isKnockout = !m.group;
+
+  if (m.group) {
+    hTeam = aPredTeam = m.home;   // same teams for both rows in group stage
+    aTeam = hPredTeam = m.away;
+    hTeam = m.home; aTeam = m.away;
+    hPredTeam = m.home; aPredTeam = m.away;
+  } else {
+    // Official bracket (real results)
+    const bktReal = _computedBracket[m.id] || {};
+    hTeam  = bktReal.home  || null;
+    aTeam  = bktReal.away  || null;
+    // Predicted bracket (player's predictions)
+    const bktPred = _predictedBracket[m.id] || {};
+    hPredTeam = bktPred.home || null;
+    aPredTeam = bktPred.away || null;
+  }
+
+  const tName = t => t ? (TEAMS[t]||'?') : 'TBD';
+  const tFlag = t => t ? (FLAGS[t]||'🏳️') : '🏴';
+
+  // ── PREDICTION ROW ──
+  const predDisabled = isKnockout
+    ? (!hPredTeam || !aPredTeam || hasResult ? 'disabled' : '')
+    : (hasResult ? 'disabled' : '');
+  const hv = hasPred ? pred.home : '';
+  const av = hasPred ? pred.away : '';
+
+  const predRow = `<div class="match-row row-prediction">
+    <span class="match-row-label">🔮 My Prediction</span>
+    <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
+      <span class="team-flag">${tFlag(hPredTeam)}</span>
+      <span class="team-name">${tName(hPredTeam)}</span>
+    </div>
+    <div class="score-area" style="display:flex;align-items:center;gap:4px">
+      <input type="number" class="score-input-pred" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${predDisabled}>
+      <span class="score-sep">:</span>
+      <input type="number" class="score-input-pred" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${predDisabled}>
+    </div>
+    <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
+      <span class="team-name" style="text-align:right">${tName(aPredTeam)}</span>
+      <span class="team-flag">${tFlag(aPredTeam)}</span>
+    </div>
+  </div>`;
+
+  // ── OFFICIAL ROW ──
+  let officialRow;
+  if (hasResult) {
+    // Show actual result with official teams
+    officialRow = `<div class="match-row row-official">
+      <span class="match-row-label">📊 Official</span>
+      <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
+        <span class="team-flag">${tFlag(hTeam)}</span>
+        <span class="team-name">${tName(hTeam)}</span>
+      </div>
+      <div class="score-area" style="display:flex;align-items:center;gap:4px">
+        <div class="score-static score-official">${result.home}</div>
+        <span class="score-sep" style="color:var(--correct-border)">:</span>
+        <div class="score-static score-official">${result.away}</div>
+      </div>
+      <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
+        <span class="team-name" style="text-align:right">${tName(aTeam)}</span>
+        <span class="team-flag">${tFlag(aTeam)}</span>
+      </div>
+    </div>`;
+  } else if (hTeam && aTeam) {
+    // Teams are known but match not played yet
+    officialRow = `<div class="match-row row-tbd">
+      <span class="match-row-label" style="color:var(--text-muted)">📋 Scheduled</span>
+      <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
+        <span class="team-flag">${tFlag(hTeam)}</span>
+        <span class="team-name">${tName(hTeam)}</span>
+      </div>
+      <div class="score-area" style="display:flex;align-items:center;gap:4px">
+        <div class="score-static">–</div>
+        <span class="score-sep">:</span>
+        <div class="score-static">–</div>
+      </div>
+      <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
+        <span class="team-name" style="text-align:right">${tName(aTeam)}</span>
+        <span class="team-flag">${tFlag(aTeam)}</span>
+      </div>
     </div>`;
   } else {
-    // Get computed bracket teams for this knockout match
-    const bkt = _computedBracket[m.id] || {};
-    const hTeam = bkt.home, aTeam = bkt.away;
-    const hKN = hTeam ? (TEAMS[hTeam]||'?') : 'TBD';
-    const aKN = aTeam ? (TEAMS[aTeam]||'?') : 'TBD';
-    const hFKN = hTeam ? (FLAGS[hTeam]||'🏳️') : '🏴';
-    const aFKN = aTeam ? (FLAGS[aTeam]||'🏳️') : '🏴';
-    const kDisabled = (!hTeam || !aTeam || hasResult) ? 'disabled' : '';
-    return `<div class="${cls}" id="mc-${m.id}">
-      <div class="match-meta"><span class="match-date">📅 ${dateStr}</span><span class="group-badge">${m.phase}</span></div>
-      ${saveInd}${ptsBadge}
-      <div class="match-label">${m.label||''}</div>
-      <div class="match-teams">
-        <div class="team-side"><span class="team-flag">${hFKN}</span><span class="team-name">${hKN}</span></div>
-        <div class="score-area">
-          <input type="number" class="score-input" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${kDisabled}>
-          <span class="score-sep">:</span>
-          <input type="number" class="score-input" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${kDisabled}>
-        </div>
-        <div class="team-side away"><span class="team-flag">${aFKN}</span><span class="team-name">${aKN}</span></div>
-      </div>${actualDisplay}
+    // Teams not yet known (knockout, waiting for earlier rounds)
+    officialRow = `<div class="match-row row-tbd">
+      <span class="match-row-label" style="color:var(--text-subtle)">📋 Scheduled</span>
+      <div style="flex:1;font-size:12px;color:var(--text-subtle);font-style:italic">Teams to be determined</div>
     </div>`;
   }
+
+  // ── SAVE INDICATOR ──
+  const saveInd = hasPred
+    ? `<span class="save-ind" style="position:static;margin-left:auto"><span class="dot-saved"></span>Saved</span>`
+    : '';
+
+  // ── LABEL for knockout ──
+  const matchLabel = isKnockout && m.label
+    ? `<div class="match-label" style="padding:4px 14px 0;font-size:11px;color:var(--text-subtle);font-style:italic">${m.label}</div>`
+    : '';
+
+  return `<div class="${cls}" id="mc-${m.id}">
+    <div class="match-header">
+      <span class="match-date" style="font-size:11px;color:var(--text-muted)">📅 ${dateStr}${m.time?' · '+m.time:''}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${saveInd}
+        ${ptsHtml}
+        <span class="group-badge">${m.group?'Group '+m.group:m.phase}</span>
+      </div>
+    </div>
+    ${matchLabel}
+    ${predRow}
+    ${officialRow}
+  </div>`;
 }
 
 function filterPhase(p){ activePhaseFilter=p; renderMatches(); }
@@ -790,6 +903,7 @@ function onScore(matchId) {
     if(!error&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
     const cnt=Object.keys(myPredictions).length;
     document.getElementById('authPredCount').textContent=`${cnt} predictions saved`;
+    try{_predictedBracket=computeBracket(myPredictions);}catch(e){}
   },600);
 }
 
@@ -1731,7 +1845,7 @@ function computeBracket(results) {
   const qfComplete    = qfResultCount >= 4;
   const sfComplete    = sfResultCount >= 2;
 
-  if (!groupComplete) return {}; // No group stage done = no bracket yet
+  // Allow partial results — only gate later rounds
 
   // Step 1: compute all group standings
   const groupStandings = {};
@@ -1771,8 +1885,9 @@ function computeBracket(results) {
 
   // Helper: get teamId of 3rd place from a group letter slot
   const get3rd = (grpLetter) => grpLetter ? (thirdByGroup[grpLetter] || null) : null;
-  const get1st = (grp) => groupStandings[grp]?.[0]?.teamId || null;
-  const get2nd = (grp) => groupStandings[grp]?.[1]?.teamId || null;
+  const grpHasRes = (grp) => Object.keys(results).some(id => GROUP_MATCHES[grp]?.includes(parseInt(id)));
+  const get1st = (grp) => grpHasRes(grp) ? (groupStandings[grp]?.[0]?.teamId || null) : null;
+  const get2nd = (grp) => grpHasRes(grp) ? (groupStandings[grp]?.[1]?.teamId || null) : null;
 
   // Step 4: populate Round of 32 (matches 73-88)
   // Fixed matchups (no 3rd place)
@@ -1849,14 +1964,11 @@ function computeBracket(results) {
 
 // Expose bracket globally so renderMatches can use it
 let _computedBracket = {};
+let _predictedBracket = {};
 
 function refreshBracket() {
-  try {
-    _computedBracket = computeBracket(matchResults);
-  } catch(e) {
-    console.error('Bracket computation error:', e);
-    _computedBracket = {};
-  }
+  try { _computedBracket  = computeBracket(matchResults);  } catch(e) { _computedBracket={}; }
+  try { _predictedBracket = computeBracket(myPredictions); } catch(e) { _predictedBracket={}; }
 }
 
 </script>
