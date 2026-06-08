@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <!-- Supabase JS SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
 :root {
   --page-bg:#0a0e1a;--page-text:#e8eaf0;--card-bg:#111828;--card-border:#1e2838;
@@ -327,6 +328,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 @media(max-width:980px){.bracket-poster-shell{padding:18px 14px}.bracket-poster-board{min-width:1520px;grid-template-columns:minmax(640px,1fr) 240px minmax(640px,1fr)}.bracket-title{font-size:32px}.bracket-center-title{font-size:34px}.bracket-side{grid-template-columns:repeat(4,minmax(150px,1fr))}}
 @media(max-width:600px){.bracket-poster-shell{padding:14px}.bracket-title{font-size:28px}.bracket-toggle-btn{padding:8px 11px;font-size:12px}.bracket-poster-board{min-width:1460px}.bracket-center-title{font-size:30px}.bracket-cup{font-size:60px}}
 
+
+.bracket-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+.bracket-export-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;background:color-mix(in srgb, var(--card-bg) 70%, transparent);border:1px solid var(--bracket-line);color:var(--bracket-strong);border-radius:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;transition:all .18s ease;}
+.bracket-export-btn:hover{transform:translateY(-1px);border-color:color-mix(in srgb, var(--bracket-mode) 32%, var(--bracket-line) 68%);background:color-mix(in srgb, var(--accent-bg) 36%, var(--card-bg) 64%);}
+.bracket-board-wrap{position:relative;display:inline-block;min-width:1700px;}
+.bracket-connectors{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;}
+.bracket-scroll .bracket-poster-board{position:relative;z-index:1;}
+.bracket-connector-path{fill:none;stroke:color-mix(in srgb, var(--card-border) 78%, var(--page-text) 22%);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;opacity:.9;filter:drop-shadow(0 1px 0 rgba(255,255,255,.04));}
+.bracket-connector-path.to-final{stroke:color-mix(in srgb, var(--accent) 62%, var(--card-border) 38%);stroke-width:2.8;}
+.bracket-connector-path.to-third{stroke:color-mix(in srgb, var(--text-muted) 44%, var(--card-border) 56%);stroke-dasharray:5 4;}
+.bracket-connector-dot{fill:color-mix(in srgb, var(--accent) 60%, var(--card-bg) 40%);opacity:.95;}
+.bracket-feature-block.final .bracket-match::after,.bracket-feature-block.third .bracket-match::after{display:none;}
+.bracket-feature-block.final{box-shadow:0 12px 40px rgba(0,0,0,.10), inset 0 1px 0 color-mix(in srgb, #ffffff 6%, transparent);}
+.bracket-feature-title::before,.bracket-feature-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg, transparent, var(--bracket-line));}
+.bracket-feature-title::after{background:linear-gradient(90deg, var(--bracket-line), transparent);}
+.bracket-title-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.bracket-poster-badge{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;border-radius:999px;background:color-mix(in srgb, var(--accent-bg) 40%, var(--card-bg) 60%);border:1px solid var(--bracket-line);color:var(--bracket-mode);font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;}
+.bracket-team-flag{position:relative;overflow:hidden;}
+.bracket-team-flag-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
+.bracket-team-emoji{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:14px;line-height:1;}
+@media(max-width:980px){.bracket-actions{width:100%;justify-content:space-between}.bracket-board-wrap{min-width:1520px}}
+@media(max-width:600px){.bracket-export-btn{padding:8px 10px;font-size:12px}}
+
 /* LOCKED STATE */
 .locked-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
 .locked-icon{font-size:52px;margin-bottom:16px;}
@@ -622,6 +646,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
 // ===== MATCH DATA =====
 const TEAMS={1:"France",2:"Spain",3:"Argentina",4:"England",5:"Portugal",6:"Brazil",7:"Netherlands",8:"Morocco",9:"Belgium",10:"Germany",11:"Croatia",12:"Italy",13:"Colombia",14:"Senegal",15:"Mexico",16:"USA",17:"Uruguay",18:"Japan",19:"Switzerland",20:"Denmark",21:"IR Iran",22:"Turkey",23:"Ecuador",24:"Austria",25:"Rep. of Korea",26:"Nigeria",27:"Australia",28:"Algeria",29:"Egypt",30:"Canada",31:"Norway",32:"Ukraine",33:"Panama",34:"Ivory Coast",35:"Poland",36:"Russia",37:"Wales",38:"Sweden",39:"Serbia",40:"Paraguay",41:"Czech Rep.",42:"Hungary",43:"Scotland",44:"Tunisia",45:"Cameroon",46:"DR Congo",47:"Greece",48:"Slovakia",49:"Venezuela",50:"Uzbekistan",51:"Costa Rica",52:"Mali",53:"Peru",54:"Chile",55:"Qatar",56:"Romania",57:"Iraq",58:"Slovenia",60:"South Africa",61:"Saudi Arabia",62:"Burkina Faso",63:"Jordan",64:"Albania",65:"Bosnia/Herzeg.",66:"Honduras",69:"Cape Verde",70:"Northern Ireland",71:"Jamaica",72:"Georgia",73:"Finland",74:"Ghana",75:"Iceland",76:"Bolivia",77:"Israel",79:"Oman",81:"Montenegro",82:"Curaçao",83:"Haiti",85:"New Zealand",86:"Bulgaria"};
 const FLAGS={1:"🇫🇷",2:"🇪🇸",3:"🇦🇷",4:"🏴󠁧󠁢󠁥󠁮󠁧󠁿",5:"🇵🇹",6:"🇧🇷",7:"🇳🇱",8:"🇲🇦",9:"🇧🇪",10:"🇩🇪",11:"🇭🇷",12:"🇮🇹",13:"🇨🇴",14:"🇸🇳",15:"🇲🇽",16:"🇺🇸",17:"🇺🇾",18:"🇯🇵",19:"🇨🇭",20:"🇩🇰",21:"🇮🇷",22:"🇹🇷",23:"🇪🇨",24:"🇦🇹",25:"🇰🇷",26:"🇳🇬",27:"🇦🇺",28:"🇩🇿",29:"🇪🇬",30:"🇨🇦",31:"🇳🇴",32:"🇺🇦",33:"🇵🇦",34:"🇨🇮",35:"🇵🇱",36:"🇷🇺",37:"🏴󠁧󠁢󠁷󠁬󠁳󠁿",38:"🇸🇪",39:"🇷🇸",40:"🇵🇾",41:"🇨🇿",42:"🇭🇺",43:"🏴󠁧󠁢󠁳󠁣󠁴󠁿",44:"🇹🇳",45:"🇨🇲",46:"🇨🇩",47:"🇬🇷",48:"🇸🇰",49:"🇻🇪",50:"🇺🇿",51:"🇨🇷",52:"🇲🇱",53:"🇵🇪",54:"🇨🇱",55:"🇶🇦",56:"🇷🇴",57:"🇮🇶",58:"🇸🇮",60:"🇿🇦",61:"🇸🇦",62:"🇧🇫",63:"🇯🇴",64:"🇦🇱",65:"🇧🇦",66:"🇭🇳",69:"🇨🇻",70:"🇬🇧",71:"🇯🇲",72:"🇬🇪",73:"🇫🇮",74:"🇬🇭",75:"🇮🇸",76:"🇧🇴",77:"🇮🇱",79:"🇴🇲",81:"🇲🇪",82:"🇨🇼",83:"🇭🇹",85:"🇳🇿",86:"🇧🇬"};
+const FLAG_CODES={1:"fr",2:"es",3:"ar",4:"gb-eng",5:"pt",6:"br",7:"nl",8:"ma",9:"be",10:"de",11:"hr",12:"it",13:"co",14:"sn",15:"mx",16:"us",17:"uy",18:"jp",19:"ch",20:"dk",21:"ir",22:"tr",23:"ec",24:"at",25:"kr",26:"ng",27:"au",28:"dz",29:"eg",30:"ca",31:"no",32:"ua",33:"pa",34:"ci",35:"pl",36:"ru",37:"gb-wls",38:"se",39:"rs",40:"py",41:"cz",42:"hu",43:"gb-sct",44:"tn",45:"cm",46:"cd",47:"gr",48:"sk",49:"ve",50:"uz",51:"cr",52:"ml",53:"pe",54:"cl",55:"qa",56:"ro",57:"iq",58:"si",60:"za",61:"sa",62:"bf",63:"jo",64:"al",65:"ba",66:"hn",69:"cv",70:"gb-nir",71:"jm",72:"ge",73:"fi",74:"gh",75:"is",76:"bo",77:"il",79:"om",81:"me",82:"cw",83:"ht",85:"nz",86:"bg"};
 const MATCHES=[
   {id:1,group:"A",home:15,away:60,date:"2026-06-11",time:"15:00"},{id:2,group:"A",home:25,away:41,date:"2026-06-11",time:"22:00"},
   {id:3,group:"B",home:30,away:65,date:"2026-06-12",time:"15:00"},{id:4,group:"D",home:16,away:40,date:"2026-06-12",time:"21:00"},
@@ -1641,12 +1666,18 @@ function renderBracket(view='predicted') {
     <div class="bracket-poster-shell ${isPred?'predicted':'official'}">
       <div class="bracket-toolbar">
         <div>
-          <div class="bracket-title">2026 World Cup Bracket</div>
+          <div class="bracket-title-wrap">
+            <div class="bracket-title">2026 World Cup Bracket</div>
+            <div class="bracket-poster-badge">Official poster style</div>
+          </div>
           <div class="bracket-sub">A richer poster-style view built from the tournament structure stored in Supabase</div>
         </div>
-        <div class="bracket-toggle">
-          <button class="bracket-toggle-btn predicted${isPred?' active':''}" onclick="renderBracket('predicted')">🔮 Predicted</button>
-          <button class="bracket-toggle-btn official${!isPred?' active':''}" onclick="renderBracket('official')">📊 Official</button>
+        <div class="bracket-actions">
+          <div class="bracket-toggle">
+            <button class="bracket-toggle-btn predicted${isPred?' active':''}" onclick="renderBracket('predicted')">🔮 Predicted</button>
+            <button class="bracket-toggle-btn official${!isPred?' active':''}" onclick="renderBracket('official')">📊 Official</button>
+          </div>
+          <button class="bracket-export-btn" onclick="exportBracketImage()">📸 Export PNG</button>
         </div>
       </div>
       <div class="bracket-stage-strip">${stagePills}</div>
@@ -1657,7 +1688,9 @@ function renderBracket(view='predicted') {
         <span class="bracket-legend-item"><span class="bracket-legend-swatch wait"></span> Waiting for feeder or missing result</span>
       </div>
       <div class="bracket-scroll">
-        <div class="bracket-poster-board">
+        <div class="bracket-board-wrap">
+          <svg class="bracket-connectors" aria-hidden="true"></svg>
+          <div class="bracket-poster-board">
           <div class="bracket-side left">
             ${renderBracketColumn('Round of 32', left.r32, source, bracket, isPred, 'r32', 'left')}
             ${renderBracketColumn('Round of 16', left.r16, source, bracket, isPred, 'r16', 'left')}
@@ -1691,6 +1724,7 @@ function renderBracket(view='predicted') {
         </div>
       </div>
     </div>`;
+  setTimeout(() => drawBracketConnectors(container), 40);
 }
 
 function getPhaseIds(key) {
@@ -1719,7 +1753,7 @@ function bracketMatchCard(matchId, source, bracket, isPredictedView, roundKey='r
     ? (roundKey === 'final' ? 'Match for the title' : 'Bronze medal match')
     : (m.label || `Match ${matchId}`);
 
-  return `<div class="bracket-match round-${roundKey}${hasRes?' has-result':''}${waiting?' waiting':''}${featured?' featured':''}">
+  return `<div class="bracket-match round-${roundKey}${hasRes?' has-result':''}${waiting?' waiting':''}${featured?' featured':''}" data-match-id="${matchId}" data-round="${roundKey}" data-board-side="${side}" data-featured="${featured?1:0}">
     <div class="bracket-match-meta">
       <span class="bracket-match-id">M${matchId}</span>
       <span class="bracket-match-date">${date}</span>
@@ -1751,6 +1785,122 @@ function bracketTeamRow(side, teamId, res, winner) {
     </div>
   </div>`;
 }
+
+function teamFlagMarkup(teamId) {
+  const emoji = teamId ? (FLAGS[teamId] || '🏳️') : '🏴';
+  if (!teamId) return `<span class="bracket-team-flag"><span class="bracket-team-emoji" aria-hidden="true">${emoji}</span></span>`;
+  const code = FLAG_CODES[teamId];
+  if (!code) return `<span class="bracket-team-flag"><span class="bracket-team-emoji" aria-hidden="true">${emoji}</span></span>`;
+  const name = TEAMS[teamId] || 'Country';
+  const src = `https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/${code}.svg`;
+  return `<span class="bracket-team-flag"><img class="bracket-team-flag-img" src="${src}" alt="${name} flag" loading="lazy" crossorigin="anonymous" onerror="this.remove()"><span class="bracket-team-emoji" aria-hidden="true">${emoji}</span></span>`;
+}
+
+function drawBracketConnectors(root=document) {
+  const wrap = root.querySelector ? root.querySelector('.bracket-board-wrap') : null;
+  const board = root.querySelector ? root.querySelector('.bracket-poster-board') : null;
+  const svg = root.querySelector ? root.querySelector('.bracket-connectors') : null;
+  if (!wrap || !board || !svg) return;
+  const boardRect = board.getBoundingClientRect();
+  if (!boardRect.width || !boardRect.height) return;
+  svg.setAttribute('viewBox', `0 0 ${boardRect.width} ${boardRect.height}`);
+  svg.setAttribute('width', boardRect.width);
+  svg.setAttribute('height', boardRect.height);
+  svg.innerHTML = '';
+  for (const [targetId, sides] of Object.entries(MATCH_SIDES || {})) {
+    const targetCard = board.querySelector(`.bracket-match[data-match-id="${targetId}"]`);
+    if (!targetCard) continue;
+    ['home','away'].forEach(side => {
+      const rule = sides && sides[side];
+      if (!rule || !rule.source_match_id || !['winner','runner_up'].includes(rule.source_type)) return;
+      const sourceCard = board.querySelector(`.bracket-match[data-match-id="${rule.source_match_id}"]`);
+      if (!sourceCard) return;
+      const sourcePoint = getConnectorPoint(sourceCard, boardRect, targetCard, false);
+      const targetRow = targetCard.querySelector(`.bracket-team-row[data-team-side="${side}"]`) || targetCard;
+      const targetPoint = getConnectorPoint(targetRow, boardRect, sourceCard, true);
+      if (!sourcePoint || !targetPoint) return;
+      const cls = targetCard.dataset.round === 'final' ? ' to-final' : (targetCard.dataset.round === 'tp' ? ' to-third' : '');
+      const d = buildConnectorPath(sourcePoint.x, sourcePoint.y, targetPoint.x, targetPoint.y);
+      svg.insertAdjacentHTML('beforeend', `<path class="bracket-connector-path${cls}" d="${d}"></path><circle class="bracket-connector-dot" cx="${targetPoint.x}" cy="${targetPoint.y}" r="2.3"></circle>`);
+    });
+  }
+}
+
+function getConnectorPoint(el, boardRect, otherEl, isTarget=false) {
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  const other = otherEl ? otherEl.getBoundingClientRect() : null;
+  const leftToRight = !other || rect.left < other.left;
+  const x = isTarget
+    ? (leftToRight ? rect.left - boardRect.left : rect.right - boardRect.left)
+    : (leftToRight ? rect.right - boardRect.left : rect.left - boardRect.left);
+  const y = rect.top - boardRect.top + rect.height / 2;
+  return { x, y };
+}
+
+function buildConnectorPath(x1, y1, x2, y2) {
+  const dir = x2 >= x1 ? 1 : -1;
+  const gap = Math.max(24, Math.min(60, Math.abs(x2 - x1) * 0.34));
+  const midX1 = x1 + gap * dir;
+  const midX2 = x2 - gap * dir;
+  return `M ${x1} ${y1} L ${midX1} ${y1} C ${midX1 + 10*dir} ${y1}, ${midX2 - 10*dir} ${y2}, ${midX2} ${y2} L ${x2} ${y2}`;
+}
+
+async function waitForBracketAssets(root) {
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch(e) {}
+  }
+  const imgs = Array.from(root.querySelectorAll('img'));
+  await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res => {
+    img.addEventListener('load', res, { once:true });
+    img.addEventListener('error', res, { once:true });
+  })));
+}
+
+async function exportBracketImage() {
+  const shell = document.querySelector('#bracketContainer .bracket-poster-shell');
+  if (!shell || typeof html2canvas === 'undefined') {
+    showToast('Export is not ready', 'Please try again in a moment.', 'error');
+    return;
+  }
+  const btn = document.querySelector('#bracketContainer .bracket-export-btn');
+  const prev = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Preparing...'; }
+  try {
+    const clone = shell.cloneNode(true);
+    clone.style.position = 'fixed';
+    clone.style.left = '-10000px';
+    clone.style.top = '0';
+    clone.style.width = Math.max(shell.scrollWidth, shell.querySelector('.bracket-board-wrap')?.scrollWidth || 0) + 'px';
+    clone.style.maxWidth = 'none';
+    clone.style.zIndex = '-1';
+    const cloneScroll = clone.querySelector('.bracket-scroll');
+    if (cloneScroll) cloneScroll.style.overflow = 'visible';
+    document.body.appendChild(clone);
+    drawBracketConnectors(clone);
+    await waitForBracketAssets(clone);
+    const canvas = await html2canvas(clone, { backgroundColor: null, scale: 2, useCORS: true, allowTaint: false, logging: false });
+    document.body.removeChild(clone);
+    const link = document.createElement('a');
+    const mode = (_bracketView || 'predicted');
+    link.download = `world-cup-2026-${mode}-bracket.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('Bracket exported', 'Your PNG download has started.', 'success');
+  } catch (e) {
+    console.error('exportBracketImage error', e);
+    showToast('Export failed', 'Could not export the bracket image.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = prev || '📸 Export PNG'; }
+  }
+}
+
+window.addEventListener('resize', () => {
+  const section = document.getElementById('section-bracket');
+  if (section && section.classList.contains('active')) {
+    setTimeout(() => drawBracketConnectors(document.getElementById('bracketContainer')), 60);
+  }
+});
 
 function formatBracketDate(rawDate) {
   if (!rawDate) return 'Date TBD';
