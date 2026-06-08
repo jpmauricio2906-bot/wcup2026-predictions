@@ -1572,6 +1572,10 @@ async function init() {
   // Theme remains in localStorage; auth no longer does.
   localStorage.removeItem('wcup2026_session');
 
+  // Load tournament structure from Supabase before any bracket or match rendering.
+  // If the structure tables cannot be read, this function keeps the built-in fallback.
+  await loadTournamentStructureFromDatabase();
+
   // Load public match results (no auth needed)
   try {
     const timeout = new Promise((_,rej)=>setTimeout(()=>rej('timeout'),5000));
