@@ -96,7 +96,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .phase-btn.active,.phase-btn:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);}
 
 
-.app-flag-badge{width:34px;min-width:34px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;flex:0 0 34px;border:1px solid color-mix(in srgb, var(--card-border) 55%, var(--page-text) 45%);box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);background:linear-gradient(90deg,var(--flag-a,#667085) 0 33%,var(--flag-b,#D0D5DD) 33% 66%,var(--flag-c,#344054) 66% 100%);}
+.app-flag-badge{width:34px;min-width:34px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;flex:0 0 34px;border:1px solid color-mix(in srgb, var(--card-border) 55%, var(--page-text) 45%);box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);background:var(--flag-gradient, linear-gradient(90deg,#667085 0 33%,#D0D5DD 33% 66%,#344054 66% 100%));}
 .app-flag-badge::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(0,0,0,.08));pointer-events:none;}
 .app-flag-code{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:13px;padding:0 3px;border-radius:4px;background:rgba(0,0,0,.46);color:#fff;font-size:8px;line-height:1;font-weight:900;letter-spacing:.25px;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.45);}
 .team-flag .app-flag-badge,.group-flag .app-flag-badge{width:34px;height:24px;}
@@ -309,7 +309,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .bracket-team-row.tbd{opacity:.82;}
 .bracket-team-main{display:flex;align-items:center;gap:8px;min-width:0;}
 .bracket-team-flag{width:34px;min-width:34px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;flex:0 0 34px;border:1px solid color-mix(in srgb, var(--card-border) 55%, var(--page-text) 45%);box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);}
-.bracket-team-flag.visual-flag{background:linear-gradient(90deg,var(--flag-a,#d62828) 0 33%,var(--flag-b,#ffffff) 33% 66%,var(--flag-c,#003049) 66% 100%);}
+.bracket-team-flag.visual-flag{background:var(--flag-gradient, linear-gradient(90deg,#d62828 0 33%,#ffffff 33% 66%,#003049 66% 100%));}
 .bracket-team-flag.visual-flag::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(0,0,0,.08));pointer-events:none;}
 .bracket-team-flag-code{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:13px;padding:0 3px;border-radius:4px;background:rgba(0,0,0,.46);color:#fff;font-size:8px;line-height:1;font-weight:900;letter-spacing:.25px;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.45);}
 .bracket-team-emoji{display:none;}
@@ -358,7 +358,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .bracket-title-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .bracket-poster-badge{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;border-radius:999px;background:color-mix(in srgb, var(--accent-bg) 40%, var(--card-bg) 60%);border:1px solid var(--bracket-line);color:var(--bracket-mode);font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;}
 .bracket-team-flag{width:34px;min-width:34px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;flex:0 0 34px;border:1px solid color-mix(in srgb, var(--card-border) 55%, var(--page-text) 45%);box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);}
-.bracket-team-flag.visual-flag{background:linear-gradient(90deg,var(--flag-a,#d62828) 0 33%,var(--flag-b,#ffffff) 33% 66%,var(--flag-c,#003049) 66% 100%);}
+.bracket-team-flag.visual-flag{background:var(--flag-gradient, linear-gradient(90deg,#d62828 0 33%,#ffffff 33% 66%,#003049 66% 100%));}
 .bracket-team-flag.visual-flag::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(0,0,0,.08));pointer-events:none;}
 .bracket-team-flag-code{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:13px;padding:0 3px;border-radius:4px;background:rgba(0,0,0,.46);color:#fff;font-size:8px;line-height:1;font-weight:900;letter-spacing:.25px;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.45);}
 .bracket-team-emoji{display:none;}
@@ -693,8 +693,8 @@ const FLAG_COLORS={
   45:["#007A5E","#CE1126","#FCD116"],46:["#007FFF","#F7D618","#CE1021"],47:["#0D5EAF","#FFFFFF","#0D5EAF"],48:["#FFFFFF","#0B4EA2","#EE1C25"],
   49:["#FCD116","#003893","#CE1126"],50:["#1EB53A","#FFFFFF","#0099B5"],51:["#002B7F","#FFFFFF","#CE1126"],52:["#14B53A","#FCD116","#CE1126"],
   53:["#D91023","#FFFFFF","#D91023"],54:["#0039A6","#FFFFFF","#D52B1E"],55:["#8A1538","#FFFFFF","#8A1538"],56:["#002B7F","#FCD116","#CE1126"],
-  57:["#CE1126","#FFFFFF","#000000"],58:["#FFFFFF","#005DA4","#ED1C24"],60:["#007A4D","#FFFFFF","#DE3831"],61:["#006C35","#FFFFFF","#006C35"],
-  62:["#EF2B2D","#FCD116","#009E49"],63:["#000000","#FFFFFF","#007A3D"],64:["#E41E20","#000000","#E41E20"],65:["#002395","#FECB00","#002395"],
+  57:["#CE1126","#FFFFFF","#000000"],58:["#FFFFFF","#005DA4","#ED1C24"],60:["#000000","#FFB612","#007749","#FFFFFF","#DE3831","#002395"],61:["#006C35","#FFFFFF","#006C35"],
+  62:["#EF2B2D","#FCD116","#009E49"],63:["#000000","#FFFFFF","#007A3D"],64:["#E41E20","#000000"],65:["#002395","#FECB00","#FFFFFF","#002395"],
   66:["#0073CF","#FFFFFF","#0073CF"],69:["#003893","#FFFFFF","#CF2027"],70:["#FFFFFF","#C8102E","#0033A0"],71:["#009B3A","#FED100","#000000"],
   72:["#FFFFFF","#FF0000","#FFFFFF"],73:["#FFFFFF","#002F6C","#FFFFFF"],74:["#CE1126","#FCD116","#006B3F"],75:["#02529C","#FFFFFF","#DC1E35"],
   76:["#D52B1E","#FCD116","#007934"],77:["#FFFFFF","#0038B8","#FFFFFF"],79:["#FFFFFF","#DB161B","#008000"],81:["#C40308","#D3AE3B","#C40308"],
@@ -1842,12 +1842,34 @@ function bracketTeamRow(side, teamId, res, winner) {
 }
 
 
+function makeFlagGradient(colors) {
+  const arr = (colors && colors.length ? colors : ['#667085','#D0D5DD','#344054']).filter(Boolean);
+  const n = arr.length;
+  const stops = arr.map((c, i) => {
+    const start = (i * 100 / n).toFixed(2);
+    const end = ((i + 1) * 100 / n).toFixed(2);
+    return `${c} ${start}% ${end}%`;
+  }).join(',');
+  return `linear-gradient(90deg, ${stops})`;
+}
+
+function makeSvgFlagRects(colors, x, y, w, h) {
+  const arr = (colors && colors.length ? colors : ['#667085','#D0D5DD','#344054']).filter(Boolean);
+  const n = arr.length;
+  return arr.map((c, i) => {
+    const sx = x + (w * i / n);
+    const sw = w / n;
+    return `<rect x="${sx}" y="${y}" width="${sw + 0.4}" height="${h}" fill="${c}"/>`;
+  }).join('');
+}
+
 function teamVisualFlagBadge(teamId) {
   const codeRaw = teamId ? (FLAG_CODES[teamId] || '') : '';
   const shortCode = codeRaw ? codeRaw.replace('gb-', '').toUpperCase().slice(0, 3) : 'TBD';
   const colors = teamId && FLAG_COLORS[teamId] ? FLAG_COLORS[teamId] : ['#667085','#D0D5DD','#344054'];
   const title = teamId ? (TEAMS[teamId] || 'Country') : 'TBD';
-  return `<span class="app-flag-badge" title="${title} flag" style="--flag-a:${colors[0]};--flag-b:${colors[1]};--flag-c:${colors[2]};">
+  const gradient = makeFlagGradient(colors);
+  return `<span class="app-flag-badge" title="${title} flag" style="--flag-gradient:${gradient};">
     <span class="app-flag-code">${shortCode}</span>
   </span>`;
 }
@@ -1944,9 +1966,8 @@ function exportTeamLineSvg(teamId, score, pen, isWinner, x, y, w, colors) {
     <rect x="${x}" y="${y}" width="${w}" height="30" rx="8" fill="${rowFill}" stroke="${rowStroke}" stroke-width="1"/>
     <clipPath id="flagClip${x}${y}"><rect x="${x+7}" y="${y+5}" width="32" height="20" rx="5"/></clipPath>
     <g clip-path="url(#flagClip${x}${y})">
-      <rect x="${x+7}" y="${y+5}" width="10.7" height="20" fill="${fc[0]}"/>
-      <rect x="${x+17.7}" y="${y+5}" width="10.7" height="20" fill="${fc[1]}"/>
-      <rect x="${x+28.4}" y="${y+5}" width="10.6" height="20" fill="${fc[2]}"/>
+      ${makeSvgFlagRects(fc, x+7, y+5, 32, 20)}
+      <rect x="${x+7}" y="${y+5}" width="32" height="20" fill="rgba(255,255,255,.08)"/>
       <rect x="${x+7}" y="${y+5}" width="32" height="20" fill="none" stroke="${colors.line}" stroke-width="1"/>
     </g>
     <rect x="${x+12}" y="${y+11}" width="22" height="11" rx="4" fill="rgba(0,0,0,.42)"/>
@@ -1956,7 +1977,6 @@ function exportTeamLineSvg(teamId, score, pen, isWinner, x, y, w, colors) {
     <text x="${x+w-18}" y="${y+21}" text-anchor="middle" fill="${colors.text}" font-size="16" font-weight="800">${safeScore}</text>
     ${penSvg}`;
 }
-
 function exportMatchSvg(matchId, x, y, w, h, source, bracket, colors) {
   const m = MATCHES.find(mm => mm.id === matchId) || { id: matchId, label: '' };
   const b = bracket[matchId] || {};
