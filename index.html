@@ -345,11 +345,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .bracket-feature-title::after{background:linear-gradient(90deg, var(--bracket-line), transparent);}
 .bracket-title-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .bracket-poster-badge{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;border-radius:999px;background:color-mix(in srgb, var(--accent-bg) 40%, var(--card-bg) 60%);border:1px solid var(--bracket-line);color:var(--bracket-mode);font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;}
-.bracket-team-flag{position:relative;overflow:hidden;}
-.bracket-team-flag-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
-.bracket-team-emoji{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:14px;line-height:1;}
+.bracket-team-flag{position:relative;overflow:hidden;border:1px solid color-mix(in srgb, var(--card-border) 60%, var(--page-text) 40%);}
+.bracket-team-emoji{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:15px;line-height:1;background:color-mix(in srgb, var(--card-bg) 72%, var(--page-bg) 28%);}
+.bracket-team-flag-code{position:absolute;right:-1px;bottom:-1px;font-size:6px;line-height:1;padding:1px 2px;border-radius:3px 0 50% 0;background:color-mix(in srgb, var(--page-bg) 76%, var(--card-bg) 24%);color:var(--text-muted);letter-spacing:.2px;font-weight:700;text-transform:uppercase;}
 @media(max-width:980px){.bracket-actions{width:100%;justify-content:space-between}.bracket-board-wrap{min-width:1520px}}
 @media(max-width:600px){.bracket-export-btn{padding:8px 10px;font-size:12px}}
+
+
+.bracket-poster-shell.exporting .bracket-scroll{overflow:visible!important;}
+.bracket-poster-shell.exporting .bracket-board-wrap{transform:none!important;}
+.bracket-poster-shell.exporting .bracket-export-btn{display:none!important;}
+.bracket-poster-shell.exporting{width:max-content;max-width:none;}
+.bracket-print-footer{display:none;margin-top:14px;padding-top:10px;border-top:1px solid var(--bracket-line);font-size:11px;color:var(--bracket-muted);text-align:center;letter-spacing:.5px;text-transform:uppercase;}
+.bracket-poster-shell.exporting .bracket-print-footer{display:block;}
+.bracket-center-ribbon{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:-4px;color:var(--bracket-mode);font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;}
+.bracket-center-ribbon::before,.bracket-center-ribbon::after{content:'';height:1px;flex:1;background:linear-gradient(90deg, transparent, var(--bracket-line));}
+.bracket-center-ribbon::after{background:linear-gradient(90deg, var(--bracket-line), transparent);}
+.bracket-match.featured::before{height:4px;}
+.bracket-feature-block.final .bracket-feature-title{color:var(--accent);}
+.bracket-poster-shell.official .bracket-feature-block.final .bracket-feature-title{color:var(--correct-border);}
+.bracket-team-row.winner .bracket-team-flag{box-shadow:0 0 0 2px color-mix(in srgb, var(--correct-border) 24%, transparent), inset 0 1px 0 color-mix(in srgb, #ffffff 12%, transparent);}
+.bracket-export-btn[disabled]{opacity:.65;cursor:wait;transform:none!important;}
 
 /* LOCKED STATE */
 .locked-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
@@ -1701,6 +1717,7 @@ function renderBracket(view='predicted') {
           <div class="bracket-center">
             <div class="bracket-mode-badge ${isPred?'predicted':'official'}">${isPred?'Predicted path':'Official path'}</div>
             <div class="bracket-cup">🏆</div>
+            <div class="bracket-center-ribbon">World Cup 2026</div>
             <div class="bracket-center-title">Road to the Final</div>
             <div class="bracket-center-sub">Flags, winners, scores, and penalty shootouts are shown directly on the bracket.</div>
             <div class="bracket-feature-block final">
@@ -1723,8 +1740,10 @@ function renderBracket(view='predicted') {
           </div>
         </div>
       </div>
+      <div class="bracket-print-footer">FIFA World Cup 2026 Predictions · Generated from the app bracket view</div>
     </div>`;
-  setTimeout(() => drawBracketConnectors(container), 40);
+  setTimeout(() => drawBracketConnectors(container), 80);
+  setTimeout(() => drawBracketConnectors(container), 350);
 }
 
 function getPhaseIds(key) {
@@ -1788,12 +1807,14 @@ function bracketTeamRow(side, teamId, res, winner) {
 
 function teamFlagMarkup(teamId) {
   const emoji = teamId ? (FLAGS[teamId] || '🏳️') : '🏴';
-  if (!teamId) return `<span class="bracket-team-flag"><span class="bracket-team-emoji" aria-hidden="true">${emoji}</span></span>`;
-  const code = FLAG_CODES[teamId];
-  if (!code) return `<span class="bracket-team-flag"><span class="bracket-team-emoji" aria-hidden="true">${emoji}</span></span>`;
-  const name = TEAMS[teamId] || 'Country';
-  const src = `https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/${code}.svg`;
-  return `<span class="bracket-team-flag"><img class="bracket-team-flag-img" src="${src}" alt="${name} flag" loading="lazy" crossorigin="anonymous" onerror="this.remove()"><span class="bracket-team-emoji" aria-hidden="true">${emoji}</span></span>`;
+  const code = teamId ? (FLAG_CODES[teamId] || '') : '';
+  const shortCode = code ? code.replace('gb-', '').toUpperCase().slice(0, 3) : '';
+  // Use native Unicode flag glyphs instead of external image files.
+  // This avoids CORS problems in PNG export and guarantees flags remain visible.
+  return `<span class="bracket-team-flag" title="${teamId ? (TEAMS[teamId] || 'Country') : 'TBD'} flag">
+    <span class="bracket-team-emoji" aria-hidden="true">${emoji}</span>
+    ${shortCode ? `<span class="bracket-team-flag-code">${shortCode}</span>` : ''}
+  </span>`;
 }
 
 function drawBracketConnectors(root=document) {
@@ -1859,38 +1880,96 @@ async function waitForBracketAssets(root) {
 
 async function exportBracketImage() {
   const shell = document.querySelector('#bracketContainer .bracket-poster-shell');
-  if (!shell || typeof html2canvas === 'undefined') {
-    showToast('Export is not ready', 'Please try again in a moment.', 'error');
+  if (!shell) {
+    showToast('No bracket is available to export.', 'error');
     return;
   }
+  if (typeof html2canvas === 'undefined') {
+    showToast('Export library is still loading. Please refresh and try again.', 'error');
+    return;
+  }
+
   const btn = document.querySelector('#bracketContainer .bracket-export-btn');
   const prev = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Preparing...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Preparing PNG...'; }
+
+  let clone = null;
   try {
-    const clone = shell.cloneNode(true);
+    drawBracketConnectors(document.getElementById('bracketContainer'));
+
+    clone = shell.cloneNode(true);
+    clone.classList.add('exporting');
     clone.style.position = 'fixed';
-    clone.style.left = '-10000px';
+    clone.style.left = '-12000px';
     clone.style.top = '0';
-    clone.style.width = Math.max(shell.scrollWidth, shell.querySelector('.bracket-board-wrap')?.scrollWidth || 0) + 'px';
-    clone.style.maxWidth = 'none';
     clone.style.zIndex = '-1';
+    clone.style.maxWidth = 'none';
+    clone.style.transform = 'none';
+
+    const liveWrap = shell.querySelector('.bracket-board-wrap');
+    const exportWidth = Math.max(shell.scrollWidth, liveWrap ? liveWrap.scrollWidth + 48 : 1800);
+    clone.style.width = exportWidth + 'px';
+
     const cloneScroll = clone.querySelector('.bracket-scroll');
-    if (cloneScroll) cloneScroll.style.overflow = 'visible';
+    if (cloneScroll) {
+      cloneScroll.style.overflow = 'visible';
+      cloneScroll.style.width = 'max-content';
+    }
+
     document.body.appendChild(clone);
+
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     drawBracketConnectors(clone);
-    await waitForBracketAssets(clone);
-    const canvas = await html2canvas(clone, { backgroundColor: null, scale: 2, useCORS: true, allowTaint: false, logging: false });
-    document.body.removeChild(clone);
-    const link = document.createElement('a');
+
+    if (document.fonts && document.fonts.ready) {
+      try { await document.fonts.ready; } catch(e) {}
+    }
+
+    const canvas = await html2canvas(clone, {
+      backgroundColor: null,
+      scale: Math.min(2, window.devicePixelRatio || 2),
+      useCORS: false,
+      allowTaint: false,
+      logging: false,
+      foreignObjectRendering: false,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: clone.scrollWidth,
+      windowHeight: clone.scrollHeight
+    });
+
     const mode = (_bracketView || 'predicted');
-    link.download = `world-cup-2026-${mode}-bracket.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    showToast('Bracket exported', 'Your PNG download has started.', 'success');
+    const downloadName = `world-cup-2026-${mode}-bracket.png`;
+
+    if (canvas.toBlob) {
+      canvas.toBlob(blob => {
+        if (!blob) {
+          const link = document.createElement('a');
+          link.download = downloadName;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = downloadName;
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }, 'image/png');
+    } else {
+      const link = document.createElement('a');
+      link.download = downloadName;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    showToast('Bracket exported as PNG.', 'success');
   } catch (e) {
     console.error('exportBracketImage error', e);
-    showToast('Export failed', 'Could not export the bracket image.', 'error');
+    showToast('Export failed. This browser blocked the capture.', 'error');
   } finally {
+    if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
     if (btn) { btn.disabled = false; btn.innerHTML = prev || '📸 Export PNG'; }
   }
 }
