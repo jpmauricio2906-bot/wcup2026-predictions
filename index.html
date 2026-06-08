@@ -258,6 +258,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
   .score-input-pred,.score-static{width:36px;height:32px;font-size:15px;}
   .match-row .team-name{font-size:11px;max-width:80px;}
 }
+
+/* PENALTY ROWS */
+.row-penalties{background:rgba(79,142,247,0.05);border-top:1px solid var(--card-border);}
+.row-penalties .match-row-label{color:#4f8ef7;}
+.score-input-pen{width:40px;height:32px;background:var(--input-bg);border:1px dashed #4f8ef7;color:#4f8ef7;border-radius:8px;text-align:center;font-size:16px;font-weight:700;font-family:'Bebas Neue',sans-serif;outline:none;transition:all .2s;-moz-appearance:textfield;}
+.score-input-pen::-webkit-inner-spin-button,.score-input-pen::-webkit-outer-spin-button{-webkit-appearance:none;}
+.score-input-pen:focus{border-color:#4f8ef7;background:rgba(79,142,247,0.1);}
+.score-input-pen:disabled{opacity:.4;cursor:not-allowed;}
+.score-static-pen{width:40px;height:32px;background:rgba(79,142,247,0.08);border:1px solid #4f8ef7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;color:#4f8ef7;}
+.pen-note{font-size:10px;color:var(--text-subtle);font-style:italic;margin-left:4px;}
 </style>
 </head>
 <body>
@@ -633,18 +643,25 @@ async function loadProfile() {
 
 async function loadMyPredictions() {
   if (!currentUser) return {};
-  const { data } = await sb.from('predictions').select('match_id,home_score,away_score').eq('player_id', currentUser.id);
+  const { data } = await sb.from('predictions').select('match_id,home_score,away_score,home_pen,away_pen').eq('player_id', currentUser.id);
   if (!data) return {};
   const map = {};
-  for (const r of data) map[r.match_id] = { home: r.home_score, away: r.away_score };
+  for (const r of data) map[r.match_id] = {
+    home: r.home_score, away: r.away_score,
+    home_pen: r.home_pen ?? null, away_pen: r.away_pen ?? null
+  };
   return map;
 }
 
 async function loadMatchResults() {
-  const { data } = await sb.from('match_results').select('match_id,home_score,away_score');
+  const { data } = await sb.from('match_results').select('match_id,home_score,away_score,home_pen,away_pen');
   if (!data) return {};
   const map = {};
-  for (const r of data) map[r.match_id] = { home: r.home_score, away: r.away_score };
+  for (const r of data) map[r.match_id] = {
+    home: r.home_score, away: r.away_score,
+    home_pen: r.home_pen ?? null, away_pen: r.away_pen ?? null,
+    isKnockout: r.match_id >= 73
+  };
   return map;
 }
 
@@ -689,10 +706,40 @@ function showSection(name, btn) {
 function calcPts(pred, result) {
   if(!pred||!result) return null;
   const {home:ph,away:pa}=pred, {home:rh,away:ra}=result;
-  if(ph===rh&&pa===ra) return 3;
-  if((ph-pa)===(rh-ra)) return 2;
-  const pr=ph>pa?1:ph<pa?-1:0, rr=rh>ra?1:rh<ra?-1:0;
-  return pr===rr?1:0;
+  const isKnockout = result.isKnockout || false;
+
+  // Regulation score points (same for all matches)
+  let pts = 0;
+  if(ph===rh && pa===ra) pts = 3;           // exact score
+  else if((ph-pa)===(rh-ra)) pts = 2;       // correct goal difference
+  else {
+    const pr=ph>pa?1:ph<pa?-1:0, rr=rh>ra?1:rh<ra?-1:0;
+    if(pr===rr) pts = 1;                    // correct result
+  }
+
+  // Penalty bonus: +1 if draw in regulation AND correct penalty winner
+  if (isKnockout && rh===ra && result.home_pen!=null && result.away_pen!=null) {
+    const resPenWinner = result.home_pen > result.away_pen ? 'home' : 'away';
+    if (pred.home_pen!=null && pred.away_pen!=null) {
+      const predPenWinner = pred.home_pen > pred.away_pen ? 'home' : 'away';
+      if (predPenWinner === resPenWinner) pts += 1;
+    }
+  }
+  return pts;
+}
+
+// Get match winner (for bracket progression)
+// Returns 'home', 'away', or null (no result yet / group stage draw)
+function getMatchWinner(result, isKnockout) {
+  if (!result) return null;
+  if (result.home > result.away) return 'home';
+  if (result.away > result.home) return 'away';
+  // Draw in regulation
+  if (isKnockout && result.home_pen != null && result.away_pen != null) {
+    if (result.home_pen > result.away_pen) return 'home';
+    if (result.away_pen > result.home_pen) return 'away';
+  }
+  return null; // genuine draw (group stage) or penalties not entered yet
 }
 
 // ===== RENDER MATCHES =====
@@ -879,6 +926,57 @@ function matchCard(m) {
   const matchLabel = !m.group && m.label
     ? `<div style="padding:4px 14px 0;font-size:11px;color:var(--text-subtle);font-style:italic">${m.label}</div>` : '';
 
+  // ── PENALTY ROWS (knockout only) ──────────────────────────────────────────
+  let predPenRow = '', officialPenRow = '';
+  if (!m.group) {
+    // Predicted penalty row — show when prediction is a draw
+    const predIsDraw = hasPred && pred.home === pred.away;
+    const predPenDisabled = !predIsDraw || !editable ? 'disabled' : '';
+    const predPenNote = !predIsDraw ? '<span class="pen-note">(enabled on draw)</span>' : '';
+    const php = pred?.home_pen ?? '', pap = pred?.away_pen ?? '';
+    predPenRow = `<div class="match-row row-penalties">
+      <span class="match-row-label">🥅 PENALTIES</span>
+      ${predPenNote}
+      <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
+        <span style="font-size:12px;color:var(--text-muted)">${tN(hPredTeam)}</span>
+      </div>
+      <div class="score-area" style="display:flex;align-items:center;gap:4px">
+        <input type="number" class="score-input-pen" min="0" max="99" value="${php}"
+          id="hp-${m.id}" placeholder="–" oninput="onPenScore(${m.id})" ${predPenDisabled}>
+        <span class="score-sep" style="color:#4f8ef7">:</span>
+        <input type="number" class="score-input-pen" min="0" max="99" value="${pap}"
+          id="ap-${m.id}" placeholder="–" oninput="onPenScore(${m.id})" ${predPenDisabled}>
+      </div>
+      <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
+        <span style="font-size:12px;color:var(--text-muted)">${tN(aPredTeam)}</span>
+      </div>
+    </div>`;
+
+    // Official penalty row — show when result is a draw and has pen data
+    const resIsDraw = hasResult && result.home === result.away;
+    if (resIsDraw) {
+      const hasPen = result.home_pen != null && result.away_pen != null;
+      officialPenRow = `<div class="match-row row-penalties">
+        <span class="match-row-label">🥅 PENALTIES</span>
+        <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--text-muted)">${tN(hOffTeam)}</span>
+        </div>
+        <div class="score-area" style="display:flex;align-items:center;gap:4px">
+          ${hasPen
+            ? `<div class="score-static-pen">${result.home_pen}</div>
+               <span class="score-sep" style="color:#4f8ef7">:</span>
+               <div class="score-static-pen">${result.away_pen}</div>`
+            : `<div class="score-static-pen" style="opacity:.4">–</div>
+               <span class="score-sep" style="color:var(--text-subtle)">:</span>
+               <div class="score-static-pen" style="opacity:.4">–</div>`}
+        </div>
+        <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
+          <span style="font-size:12px;color:var(--text-muted)">${tN(aOffTeam)}</span>
+        </div>
+      </div>`;
+    }
+  }
+
   return `<div class="${cls}" id="mc-${m.id}">
     <div class="match-header">
       <span class="match-date" style="font-size:11px;color:var(--text-muted)">📅 ${dateStr}${m.time?' · '+m.time:''}</span>
@@ -889,11 +987,33 @@ function matchCard(m) {
     </div>
     ${matchLabel}
     ${predRow}
+    ${predPenRow}
     ${officialRow}
+    ${officialPenRow}
   </div>`;
 }
 
 function filterPhase(p){ activePhaseFilter=p; renderMatches(); }
+
+async function onPenScore(matchId) {
+  if (!currentUser) return;
+  const hp = parseInt(document.getElementById(`hp-${matchId}`)?.value);
+  const ap = parseInt(document.getElementById(`ap-${matchId}`)?.value);
+  if (isNaN(hp)||isNaN(ap)||hp<0||ap<0||hp===ap) return; // penalties can't draw
+  if (!myPredictions[matchId]) return;
+  myPredictions[matchId].home_pen = hp;
+  myPredictions[matchId].away_pen = ap;
+  clearTimeout(saveTimers[`pen-${matchId}`]);
+  saveTimers[`pen-${matchId}`] = setTimeout(async()=>{
+    await sb.from('predictions').upsert({
+      player_id: currentUser.id, match_id: matchId,
+      home_score: myPredictions[matchId].home,
+      away_score: myPredictions[matchId].away,
+      home_pen: hp, away_pen: ap
+    },{onConflict:'player_id,match_id'});
+    try{_predictedBracket=computeBracket(myPredictions);}catch(e){}
+  }, 600);
+}
 
 function onScore(matchId) {
   if(!currentUser) return;
@@ -910,8 +1030,12 @@ function onScore(matchId) {
   else if(card){ card.insertAdjacentHTML('beforeend',`<div class="save-ind" id="ind-${matchId}"><span class="dot-saving"></span>Saving…</div>`); ind=card.querySelector('.save-ind'); }
   clearTimeout(saveTimers[matchId]);
   saveTimers[matchId]=setTimeout(async()=>{
+    const penData = matchId >= 73 ? {
+      home_pen: myPredictions[matchId]?.home_pen ?? null,
+      away_pen: myPredictions[matchId]?.away_pen ?? null
+    } : {};
     const {error}=await sb.from('predictions').upsert({
-      player_id:currentUser.id, match_id:matchId, home_score:hi, away_score:ai
+      player_id:currentUser.id, match_id:matchId, home_score:hi, away_score:ai, ...penData
     },{onConflict:'player_id,match_id'});
     if(!error&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
     const cnt=Object.keys(myPredictions).length;
@@ -1057,10 +1181,21 @@ async function renderAdmin() {
               </div>
               <div class="match-teams">
                 <div class="team-side"><span class="team-flag">${hF}</span><span class="team-name" style="max-width:110px">${hN}</span></div>
-                <div class="score-area">
-                  <input type="number" class="score-input admin-input" min="0" max="99" value="${res?res.home:''}" id="rh-${m.id}" placeholder="–">
-                  <span class="score-sep">:</span>
-                  <input type="number" class="score-input admin-input" min="0" max="99" value="${res?res.away:''}" id="ra-${m.id}" placeholder="–">
+                <div class="score-area" style="flex-direction:column;gap:6px;align-items:center">
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <span style="font-size:10px;color:var(--text-muted);min-width:60px">Regulation</span>
+                    <input type="number" class="score-input admin-input" min="0" max="99" value="${res?res.home:''}" id="rh-${m.id}" placeholder="–"
+                      oninput="toggleAdminPen(${m.id})">
+                    <span class="score-sep">:</span>
+                    <input type="number" class="score-input admin-input" min="0" max="99" value="${res?res.away:''}" id="ra-${m.id}" placeholder="–"
+                      oninput="toggleAdminPen(${m.id})">
+                  </div>
+                  <div id="adm-pen-${m.id}" style="display:${res&&res.home===res.away&&res.home_pen!=null?'flex':'none'};align-items:center;gap:4px">
+                    <span style="font-size:10px;color:#4f8ef7;min-width:60px">Penalties</span>
+                    <input type="number" class="score-input-pen" min="0" max="99" value="${res?.home_pen??''}" id="rhp-${m.id}" placeholder="–">
+                    <span class="score-sep" style="color:#4f8ef7">:</span>
+                    <input type="number" class="score-input-pen" min="0" max="99" value="${res?.away_pen??''}" id="rap-${m.id}" placeholder="–">
+                  </div>
                 </div>
                 <div class="team-side away"><span class="team-flag">${aF}</span><span class="team-name" style="max-width:110px">${aN}</span></div>
               </div>
@@ -1076,13 +1211,33 @@ async function renderAdmin() {
     }).join('')}`;
 }
 
+function toggleAdminPen(matchId) {
+  const h=parseInt(document.getElementById(`rh-${matchId}`)?.value);
+  const a=parseInt(document.getElementById(`ra-${matchId}`)?.value);
+  const penDiv=document.getElementById(`adm-pen-${matchId}`);
+  if(penDiv) penDiv.style.display=(!isNaN(h)&&!isNaN(a)&&h===a)?'flex':'none';
+}
+
 async function saveResult(matchId) {
   const h=parseInt(document.getElementById(`rh-${matchId}`).value);
   const a=parseInt(document.getElementById(`ra-${matchId}`).value);
   if(isNaN(h)||isNaN(a)||h<0||a<0){showToast('Enter valid scores','error');return;}
-  const {error}=await sb.from('match_results').upsert({match_id:matchId,home_score:h,away_score:a},{onConflict:'match_id'});
-  if(!error){matchResults[matchId]={home:h,away:a};refreshBracket();showToast(`Result saved: ${h}–${a} ✓`,'success');renderAdmin();}
-  else showToast('Error saving result','error');
+  let homePen=null, awayPen=null;
+  if(matchId>=73 && h===a){
+    const hp=parseInt(document.getElementById(`rhp-${matchId}`)?.value);
+    const ap=parseInt(document.getElementById(`rap-${matchId}`)?.value);
+    if(!isNaN(hp)&&!isNaN(ap)&&hp>=0&&ap>=0&&hp!==ap){homePen=hp;awayPen=ap;}
+  }
+  const {error}=await sb.from('match_results').upsert(
+    {match_id:matchId,home_score:h,away_score:a,home_pen:homePen,away_pen:awayPen},
+    {onConflict:'match_id'}
+  );
+  if(!error){
+    matchResults[matchId]={home:h,away:a,home_pen:homePen,away_pen:awayPen,isKnockout:matchId>=73};
+    try{refreshBracket();}catch(e){}
+    showToast(`Result saved: ${h}\u2013${a}${homePen!=null?' (pens: '+homePen+'\u2013'+awayPen+')':''} \u2713`,'success');
+    renderAdmin();
+  } else showToast('Error saving result','error');
 }
 
 async function deleteResult(matchId) {
@@ -1947,20 +2102,16 @@ function computeBracket(results) {
   // Step 5: populate later rounds — only when previous phase is complete
   // Winner of match = team that scored more goals (from results)
   const getWinner = (mid) => {
-    const r = results[mid];
-    const b = bracket[mid];
+    const r = results[mid], b = bracket[mid];
     if (!r || !b) return null;
-    if (r.home > r.away) return b.home;
-    if (r.away > r.home) return b.away;
-    return null; // draw — no winner yet (knockout uses extra time/pens but we can't know)
+    const w = getMatchWinner(r, true); // true = isKnockout
+    return w === 'home' ? b.home : w === 'away' ? b.away : null;
   };
   const getLoser = (mid) => {
-    const r = results[mid];
-    const b = bracket[mid];
+    const r = results[mid], b = bracket[mid];
     if (!r || !b) return null;
-    if (r.home > r.away) return b.away;
-    if (r.away > r.home) return b.home;
-    return null;
+    const w = getMatchWinner(r, true);
+    return w === 'home' ? b.away : w === 'away' ? b.home : null;
   };
 
   // Round of 16 — only when all R32 results are in
