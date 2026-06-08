@@ -300,7 +300,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .bracket-team-row.winner{background:color-mix(in srgb, var(--correct-border) 14%, var(--card-bg) 86%);border-color:color-mix(in srgb, var(--correct-border) 26%, transparent);box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 4%, transparent);}
 .bracket-team-row.tbd{opacity:.82;}
 .bracket-team-main{display:flex;align-items:center;gap:8px;min-width:0;}
-.bracket-team-flag{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--page-bg) 32%, var(--card-bg) 68%);font-size:14px;box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);flex:0 0 22px;}
+.bracket-team-flag{width:32px;min-width:32px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--page-bg) 32%, var(--card-bg) 68%);font-size:18px;box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);flex:0 0 32px;}
 .bracket-team-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--bracket-strong);}
 .bracket-score-wrap{display:flex;align-items:center;gap:6px;justify-content:flex-end;}
 .bracket-score-box{min-width:28px;padding:4px 7px;border-radius:8px;background:color-mix(in srgb, var(--page-bg) 22%, var(--card-bg) 78%);border:1px solid var(--bracket-line);font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;color:var(--bracket-strong);text-align:center;}
@@ -345,9 +345,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .bracket-feature-title::after{background:linear-gradient(90deg, var(--bracket-line), transparent);}
 .bracket-title-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .bracket-poster-badge{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;border-radius:999px;background:color-mix(in srgb, var(--accent-bg) 40%, var(--card-bg) 60%);border:1px solid var(--bracket-line);color:var(--bracket-mode);font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;}
-.bracket-team-flag{position:relative;overflow:hidden;border:1px solid color-mix(in srgb, var(--card-border) 60%, var(--page-text) 40%);}
-.bracket-team-emoji{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:15px;line-height:1;background:color-mix(in srgb, var(--card-bg) 72%, var(--page-bg) 28%);}
-.bracket-team-flag-code{position:absolute;right:-1px;bottom:-1px;font-size:6px;line-height:1;padding:1px 2px;border-radius:3px 0 50% 0;background:color-mix(in srgb, var(--page-bg) 76%, var(--card-bg) 24%);color:var(--text-muted);letter-spacing:.2px;font-weight:700;text-transform:uppercase;}
+.bracket-team-flag{position:relative;overflow:visible;border:1px solid color-mix(in srgb, var(--card-border) 60%, var(--page-text) 40%);}
+.bracket-team-emoji{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:18px;line-height:1;background:color-mix(in srgb, var(--card-bg) 72%, var(--page-bg) 28%);border-radius:6px;}
+.bracket-team-flag-code{position:absolute;right:-4px;bottom:-5px;font-size:7px;line-height:1;padding:1px 3px;border-radius:4px;background:color-mix(in srgb, var(--page-bg) 82%, var(--card-bg) 18%);color:var(--text-muted);letter-spacing:.2px;font-weight:800;text-transform:uppercase;border:1px solid var(--card-border);}
 @media(max-width:980px){.bracket-actions{width:100%;justify-content:space-between}.bracket-board-wrap{min-width:1520px}}
 @media(max-width:600px){.bracket-export-btn{padding:8px 10px;font-size:12px}}
 
@@ -1791,11 +1791,10 @@ function bracketTeamRow(side, teamId, res, winner) {
   const pen = res && res.home === res.away
     ? (side === 'home' ? res.home_pen : res.away_pen)
     : null;
-  const flag = teamId ? (FLAGS[teamId] || '🏳️') : '🏴';
   const name = teamId ? (TEAMS[teamId] || 'TBD') : 'TBD';
-  return `<div class="bracket-team-row${isWinner?' winner':''}${!teamId?' tbd':''}">
+  return `<div class="bracket-team-row${isWinner?' winner':''}${!teamId?' tbd':''}" data-team-side="${side}">
     <div class="bracket-team-main">
-      <span class="bracket-team-flag">${flag}</span>
+      ${teamFlagMarkup(teamId)}
       <span class="bracket-team-name">${name}</span>
     </div>
     <div class="bracket-score-wrap">
@@ -1804,6 +1803,7 @@ function bracketTeamRow(side, teamId, res, winner) {
     </div>
   </div>`;
 }
+
 
 function teamFlagMarkup(teamId) {
   const emoji = teamId ? (FLAGS[teamId] || '🏳️') : '🏴';
@@ -1878,98 +1878,219 @@ async function waitForBracketAssets(root) {
   })));
 }
 
-async function exportBracketImage() {
-  const shell = document.querySelector('#bracketContainer .bracket-poster-shell');
-  if (!shell) {
-    showToast('No bracket is available to export.', 'error');
-    return;
-  }
-  if (typeof html2canvas === 'undefined') {
-    showToast('Export library is still loading. Please refresh and try again.', 'error');
-    return;
-  }
+function xmlEscape(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
+}
 
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function exportTeamLineSvg(teamId, score, pen, isWinner, x, y, w, colors) {
+  const flag = teamId ? (FLAGS[teamId] || '🏳️') : '🏴';
+  const code = teamId ? ((FLAG_CODES[teamId] || '').replace('gb-', '').toUpperCase().slice(0,3)) : '';
+  const name = teamId ? (TEAMS[teamId] || 'TBD') : 'TBD';
+  const rowFill = isWinner ? colors.winFill : colors.rowFill;
+  const rowStroke = isWinner ? colors.winStroke : colors.line;
+  const safeName = xmlEscape(name.length > 18 ? name.slice(0,17) + '…' : name);
+  const safeScore = xmlEscape(score == null ? '–' : score);
+  const penSvg = pen != null && pen !== '' ? `<text x="${x+w-43}" y="${y+21}" fill="${colors.pen}" font-size="9" font-weight="800">P${xmlEscape(pen)}</text>` : '';
+  return `
+    <rect x="${x}" y="${y}" width="${w}" height="30" rx="8" fill="${rowFill}" stroke="${rowStroke}" stroke-width="1"/>
+    <rect x="${x+7}" y="${y+5}" width="32" height="20" rx="5" fill="${colors.surface2}" stroke="${colors.line}" stroke-width="1"/>
+    <text x="${x+23}" y="${y+21}" text-anchor="middle" font-size="16">${xmlEscape(flag)}</text>
+    ${code ? `<text x="${x+37}" y="${y+27}" fill="${colors.muted}" font-size="6" font-weight="800">${xmlEscape(code)}</text>` : ''}
+    <text x="${x+47}" y="${y+20}" fill="${colors.text}" font-size="12" font-weight="${isWinner ? '800':'650'}">${safeName}</text>
+    <rect x="${x+w-30}" y="${y+5}" width="24" height="20" rx="6" fill="${colors.surface2}" stroke="${colors.line}" stroke-width="1"/>
+    <text x="${x+w-18}" y="${y+21}" text-anchor="middle" fill="${colors.text}" font-size="16" font-weight="800">${safeScore}</text>
+    ${penSvg}`;
+}
+
+function exportMatchSvg(matchId, x, y, w, h, source, bracket, colors) {
+  const m = MATCHES.find(mm => mm.id === matchId) || { id: matchId, label: '' };
+  const b = bracket[matchId] || {};
+  const res = source[matchId];
+  const winner = res && b.home && b.away ? getMatchWinner(res, true) : null;
+  const date = m.date ? formatBracketDate(m.date) : '';
+  const label = xmlEscape((m.label || `Match ${matchId}`).slice(0, 28));
+  const homePen = res && res.home === res.away ? res.home_pen : null;
+  const awayPen = res && res.home === res.away ? res.away_pen : null;
+
+  return `
+    <g class="match-${matchId}">
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="${colors.card}" stroke="${colors.line}" stroke-width="1.2"/>
+      <rect x="${x}" y="${y}" width="${w}" height="4" rx="2" fill="${colors.mode}"/>
+      <text x="${x+10}" y="${y+18}" fill="${colors.mode}" font-size="10" font-weight="800">M${matchId}</text>
+      <text x="${x+w-10}" y="${y+18}" text-anchor="end" fill="${colors.muted}" font-size="10" font-weight="700">${xmlEscape(date)}</text>
+      <text x="${x+10}" y="${y+34}" fill="${colors.subtle}" font-size="9" font-style="italic">${label}</text>
+      ${exportTeamLineSvg(b.home, res ? res.home : null, homePen, winner === 'home', x+8, y+43, w-16, colors)}
+      ${exportTeamLineSvg(b.away, res ? res.away : null, awayPen, winner === 'away', x+8, y+78, w-16, colors)}
+    </g>`;
+}
+
+async function exportBracketImage() {
   const btn = document.querySelector('#bracketContainer .bracket-export-btn');
   const prev = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Preparing PNG...'; }
 
-  let clone = null;
   try {
-    drawBracketConnectors(document.getElementById('bracketContainer'));
+    refreshBracket();
+    const isPred = _bracketView !== 'official';
+    const source = isPred ? myPredictions : matchResults;
+    const bracket = isPred ? _predictedBracket : _computedBracket;
 
-    clone = shell.cloneNode(true);
-    clone.classList.add('exporting');
-    clone.style.position = 'fixed';
-    clone.style.left = '-12000px';
-    clone.style.top = '0';
-    clone.style.zIndex = '-1';
-    clone.style.maxWidth = 'none';
-    clone.style.transform = 'none';
+    const colors = {
+      bg: cssVar('--page-bg', '#0a0e1a'),
+      text: cssVar('--page-text', '#e8eaf0'),
+      card: cssVar('--card-bg', '#111828'),
+      surface2: cssVar('--input-bg', '#0d1420'),
+      line: cssVar('--card-border', '#1e2838'),
+      muted: cssVar('--text-muted', '#7a8298'),
+      subtle: cssVar('--text-subtle', '#4a5068'),
+      mode: isPred ? cssVar('--accent', '#e8c53a') : cssVar('--correct-border', '#2ecc71'),
+      rowFill: cssVar('--input-bg', '#0d1420'),
+      winFill: cssVar('--correct-bg', '#0d2214'),
+      winStroke: cssVar('--correct-border', '#2ecc71'),
+      pen: '#4f8ef7'
+    };
 
-    const liveWrap = shell.querySelector('.bracket-board-wrap');
-    const exportWidth = Math.max(shell.scrollWidth, liveWrap ? liveWrap.scrollWidth + 48 : 1800);
-    clone.style.width = exportWidth + 'px';
+    const W = 2400, H = 1420, matchW = 230, matchH = 120;
+    const colX = [60, 340, 620, 900, 1270, 1550, 1830, 2110];
+    const centerX = 1110;
 
-    const cloneScroll = clone.querySelector('.bracket-scroll');
-    if (cloneScroll) {
-      cloneScroll.style.overflow = 'visible';
-      cloneScroll.style.width = 'max-content';
+    const ids = {
+      r32: getPhaseIds('r32'),
+      r16: getPhaseIds('r16'),
+      qf: getPhaseIds('qf'),
+      sf: getPhaseIds('sf'),
+      tp: getPhaseIds('tp'),
+      final: getPhaseIds('final')
+    };
+    const L = {
+      r32: ids.r32.slice(0,8), r16: ids.r16.slice(0,4), qf: ids.qf.slice(0,2), sf: ids.sf.slice(0,1)
+    };
+    const R = {
+      sf: ids.sf.slice(1), qf: ids.qf.slice(2), r16: ids.r16.slice(4), r32: ids.r32.slice(8)
+    };
+
+    const pos = {};
+    function place(list, x, top, gap) {
+      return list.map((id, i) => {
+        const y = top + i * gap;
+        pos[id] = { x, y, w: matchW, h: matchH };
+        return exportMatchSvg(id, x, y, matchW, matchH, source, bracket, colors);
+      }).join('');
     }
 
-    document.body.appendChild(clone);
+    let matchesSvg = '';
+    matchesSvg += place(L.r32, colX[0], 150, 145);
+    matchesSvg += place(L.r16, colX[1], 225, 290);
+    matchesSvg += place(L.qf,  colX[2], 370, 580);
+    matchesSvg += place(L.sf,  colX[3], 650, 1);
+    matchesSvg += place(R.sf,  colX[4], 650, 1);
+    matchesSvg += place(R.qf,  colX[5], 370, 580);
+    matchesSvg += place(R.r16, colX[6], 225, 290);
+    matchesSvg += place(R.r32, colX[7], 150, 145);
 
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    drawBracketConnectors(clone);
+    const finalId = ids.final[0], tpId = ids.tp[0];
+    if (finalId) { pos[finalId] = { x:centerX, y:515, w:250, h:128 }; matchesSvg += exportMatchSvg(finalId, centerX, 515, 250, 128, source, bracket, colors); }
+    if (tpId) { pos[tpId] = { x:centerX, y:770, w:250, h:128 }; matchesSvg += exportMatchSvg(tpId, centerX, 770, 250, 128, source, bracket, colors); }
 
-    if (document.fonts && document.fonts.ready) {
-      try { await document.fonts.ready; } catch(e) {}
+    function conn(x1,y1,x2,y2, cls='') {
+      const dx = Math.max(35, Math.min(85, Math.abs(x2-x1)*0.38));
+      const dir = x2 >= x1 ? 1 : -1;
+      return `<path d="M ${x1} ${y1} L ${x1+dx*dir} ${y1} C ${x1+dx*dir} ${y1}, ${x2-dx*dir} ${y2}, ${x2-dx*dir} ${y2} L ${x2} ${y2}" fill="none" stroke="${cls==='final'?colors.mode:colors.line}" stroke-width="${cls==='final'?3:2}" stroke-linecap="round" stroke-linejoin="round" ${cls==='third'?'stroke-dasharray="6 5"':''}/>`;
     }
 
-    const canvas = await html2canvas(clone, {
-      backgroundColor: null,
-      scale: Math.min(2, window.devicePixelRatio || 2),
-      useCORS: false,
-      allowTaint: false,
-      logging: false,
-      foreignObjectRendering: false,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: clone.scrollWidth,
-      windowHeight: clone.scrollHeight
+    let connectors = '';
+    for (const [targetId, sides] of Object.entries(MATCH_SIDES || {})) {
+      const t = pos[targetId];
+      if (!t) continue;
+      ['home','away'].forEach(side => {
+        const rule = sides && sides[side];
+        if (!rule || !rule.source_match_id || !pos[rule.source_match_id]) return;
+        const s = pos[rule.source_match_id];
+        const sRight = s.x < t.x;
+        const x1 = sRight ? s.x + s.w : s.x;
+        const y1 = s.y + s.h/2;
+        const x2 = sRight ? t.x : t.x + t.w;
+        const y2 = t.y + (side === 'home' ? 58 : 93);
+        const cls = Number(targetId) === finalId ? 'final' : Number(targetId) === tpId ? 'third' : '';
+        connectors += conn(x1,y1,x2,y2,cls);
+      });
+    }
+
+    const title = isPred ? 'PREDICTED BRACKET' : 'OFFICIAL BRACKET';
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <rect width="100%" height="100%" fill="${colors.bg}"/>
+  <circle cx="${W/2}" cy="110" r="260" fill="${colors.mode}" opacity="0.08"/>
+  <text x="${W/2}" y="68" text-anchor="middle" fill="${colors.text}" font-family="Arial, sans-serif" font-size="52" font-weight="900" letter-spacing="3">2026 WORLD CUP BRACKET</text>
+  <text x="${W/2}" y="103" text-anchor="middle" fill="${colors.mode}" font-family="Arial, sans-serif" font-size="18" font-weight="800" letter-spacing="4">${title}</text>
+  <text x="${W/2}" y="145" text-anchor="middle" fill="${colors.text}" font-family="Arial, sans-serif" font-size="56">🏆</text>
+  <g opacity="0.92">${connectors}</g>
+  ${matchesSvg}
+  <text x="${W/2}" y="${H-34}" text-anchor="middle" fill="${colors.muted}" font-family="Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="1">FIFA WORLD CUP 2026 PREDICTIONS · GENERATED FROM THE APP</text>
+</svg>`;
+
+    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = svgUrl;
     });
 
-    const mode = (_bracketView || 'predicted');
-    const downloadName = `world-cup-2026-${mode}-bracket.png`;
+    const canvas = document.createElement('canvas');
+    canvas.width = W * 2;
+    canvas.height = H * 2;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2,2);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(svgUrl);
 
-    if (canvas.toBlob) {
+    const mode = isPred ? 'predicted' : 'official';
+    const pngName = `world-cup-2026-${mode}-bracket.png`;
+
+    await new Promise(resolve => {
       canvas.toBlob(blob => {
-        if (!blob) {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
-          link.download = downloadName;
+          link.download = pngName;
+          link.href = url;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } else {
+          const link = document.createElement('a');
+          link.download = pngName;
           link.href = canvas.toDataURL('image/png');
           link.click();
-          return;
         }
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.download = downloadName;
-        link.href = url;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        resolve();
       }, 'image/png');
-    } else {
-      const link = document.createElement('a');
-      link.download = downloadName;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    }
+    });
 
     showToast('Bracket exported as PNG.', 'success');
-  } catch (e) {
-    console.error('exportBracketImage error', e);
-    showToast('Export failed. This browser blocked the capture.', 'error');
+  } catch(e) {
+    console.error('exportBracketImage fallback error', e);
+    showToast('PNG export failed. Downloading SVG instead.', 'error');
+
+    // Last-resort SVG download, still an image format and never uses canvas.
+    const mode = (_bracketView || 'predicted');
+    const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500"><rect width="100%" height="100%" fill="#111828"/><text x="600" y="230" text-anchor="middle" fill="#e8c53a" font-family="Arial" font-size="36" font-weight="700">World Cup 2026 Bracket</text><text x="600" y="280" text-anchor="middle" fill="#e8eaf0" font-family="Arial" font-size="18">PNG export was blocked by the browser.</text></svg>`;
+    const blob = new Blob([fallbackSvg], { type:'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `world-cup-2026-${mode}-bracket.svg`;
+    link.href = url;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   } finally {
-    if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
     if (btn) { btn.disabled = false; btn.innerHTML = prev || '📸 Export PNG'; }
   }
 }
