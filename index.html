@@ -2023,12 +2023,20 @@ let playerConfirmations = new Set();
 // Load confirmations from Supabase
 async function loadConfirmations() {
   if (!currentUser) { playerConfirmations = new Set(); return; }
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/phase_confirmations?player_id=eq.${currentUser.id}&select=phase`,
-    { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${_currentSession?.access_token||SUPABASE_KEY}` } }
-  );
-  const data = await res.json();
-  playerConfirmations = new Set((data||[]).map(r=>r.phase));
+  try {
+    const token = _currentSession?.access_token || SUPABASE_KEY;
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/phase_confirmations?player_id=eq.${currentUser.id}&select=phase`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${token}` } }
+    );
+    const data = await res.json();
+    const phases = (Array.isArray(data) ? data : []).map(r=>r.phase);
+    playerConfirmations = new Set(phases);
+    console.log('Loaded confirmations:', [...playerConfirmations]);
+  } catch(e) {
+    console.error('loadConfirmations error:', e);
+    playerConfirmations = new Set();
+  }
 }
 
 // Confirm a phase
@@ -2043,24 +2051,33 @@ async function confirmPhase(phaseKey) {
     return;
   }
   if (!confirm(`Confirm your ${phase.label} predictions? They will be locked and cannot be changed.`)) return;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/phase_confirmations`, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${_currentSession?.access_token||SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates,return=minimal'
-    },
-    body: JSON.stringify({ player_id: currentUser.id, phase: phaseKey })
-  });
-  if (res.ok || res.status===201 || res.status===204) {
-    playerConfirmations.add(phaseKey);
-    try { _predictedBracket = computeBracket(myPredictions); } catch(e) {}
-    try { _computedBracket  = computeBracket(matchResults);  } catch(e) {}
-    showToast(`${phase.label} predictions confirmed! ✓`, 'success');
-    renderMatches();
-  } else {
-    showToast('Error confirming — please try again', 'error');
+
+  // Optimistically update UI immediately — don't wait for network
+  playerConfirmations.add(phaseKey);
+  try { _predictedBracket = computeBracket(myPredictions); } catch(e) {}
+  try { _computedBracket  = computeBracket(matchResults);  } catch(e) {}
+  showToast(`${phase.label} predictions confirmed! ✓`, 'success');
+  renderMatches();
+
+  // Save to Supabase in background
+  try {
+    const token = _currentSession?.access_token || SUPABASE_KEY;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/phase_confirmations`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({ player_id: currentUser.id, phase: phaseKey })
+    });
+    if (!res.ok && res.status !== 201 && res.status !== 204) {
+      console.error('Confirmation save failed:', res.status, await res.text());
+      showToast('Warning: confirmation may not have saved — please refresh to verify', 'error');
+    }
+  } catch(e) {
+    console.error('Confirmation network error:', e);
   }
 }
 
