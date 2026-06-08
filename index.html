@@ -439,6 +439,34 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 const SUPABASE_URL = 'https://bbcmrgsxxowjwcmgrilk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_7g8UYr7kQ1d9Lg0vafvC8A_UGGcwLZX';
 
+// Get valid auth token, refreshing if expired
+async function getAuthToken() {
+  if (!_currentSession) return SUPABASE_KEY;
+  const now = Math.floor(Date.now()/1000);
+  if (_currentSession.expires_at && now < _currentSession.expires_at - 60) {
+    return _currentSession.access_token;
+  }
+  // Refresh token
+  if (_currentSession.refresh_token) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method:'POST',
+        headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({refresh_token:_currentSession.refresh_token})
+      });
+      if (r.ok) {
+        const d = await r.json();
+        if (d.access_token) {
+          _currentSession = d;
+          localStorage.setItem('wcup2026_session', JSON.stringify(d));
+          return d.access_token;
+        }
+      }
+    } catch(e) { console.warn('Token refresh failed',e); }
+  }
+  return _currentSession.access_token || SUPABASE_KEY;
+}
+
 // Init Supabase client
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -1011,7 +1039,7 @@ async function onPenScore(matchId) {
       away_score: myPredictions[matchId].away,
       home_pen: hp, away_pen: ap
     },{onConflict:'player_id,match_id'});
-    try{_predictedBracket=computeBracket(myPredictions);}catch(e){}
+    try{_predictedBracket=computeBracket(myPredictions,true);}catch(e){}
   }, 600);
 }
 
@@ -1040,7 +1068,7 @@ function onScore(matchId) {
     if(!error&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
     const cnt=Object.keys(myPredictions).length;
     document.getElementById('authPredCount').textContent=`${cnt} predictions saved`;
-    try{_predictedBracket=computeBracket(myPredictions);}catch(e){}
+    try{_predictedBracket=computeBracket(myPredictions,true);}catch(e){}
     // Re-render to update confirm button
     renderMatches();
   },600);
@@ -2002,24 +2030,22 @@ function computeGroupStandings(group, results) {
 }
 
 // Compute bracket: returns { teamId } for each match slot
-function computeBracket(results) {
+function computeBracket(results, partial=false) {
   const bracket = {}; // matchId -> { home: teamId, away: teamId }
 
-  // Gate: only compute bracket if enough group results are in
-  // Each phase unlocks when all matches in the previous phase have results
-  const groupResultCount = Object.keys(results).filter(id => parseInt(id) <= 72).length;
-  const r32ResultCount   = Object.keys(results).filter(id => parseInt(id) >= 73 && parseInt(id) <= 88).length;
-  const r16ResultCount   = Object.keys(results).filter(id => parseInt(id) >= 89 && parseInt(id) <= 96).length;
-  const qfResultCount    = Object.keys(results).filter(id => parseInt(id) >= 97 && parseInt(id) <= 100).length;
-  const sfResultCount    = Object.keys(results).filter(id => parseInt(id) >= 101 && parseInt(id) <= 102).length;
+  // Gate: phases unlock progressively based on partial/full results
+  const r32Count = Object.keys(results).filter(id=>parseInt(id)>=73&&parseInt(id)<=88).length;
+  const r16Count = Object.keys(results).filter(id=>parseInt(id)>=89&&parseInt(id)<=96).length;
+  const qfCount  = Object.keys(results).filter(id=>parseInt(id)>=97&&parseInt(id)<=100).length;
+  const sfCount  = Object.keys(results).filter(id=>parseInt(id)>=101&&parseInt(id)<=102).length;
 
-  const groupComplete = groupResultCount >= 72;
-  const r32Complete   = r32ResultCount >= 16;
-  const r16Complete   = r16ResultCount >= 8;
-  const qfComplete    = qfResultCount >= 4;
-  const sfComplete    = sfResultCount >= 2;
+  // partial=true: used for predicted bracket (shows next round as soon as any match filled)
+  // partial=false: used for real bracket (requires full phase completion)
+  const r32Done = partial ? r32Count >= 1  : r32Count >= 16;
+  const r16Done = partial ? r16Count >= 1  : r16Count >= 8;
+  const qfDone  = partial ? qfCount  >= 1  : qfCount  >= 4;
+  const sfDone  = partial ? sfCount  >= 1  : sfCount  >= 2;
 
-  // No gate — partial results compute partial bracket
 
   // Step 1: compute all group standings
   const groupStandings = {};
@@ -2115,7 +2141,7 @@ function computeBracket(results) {
   };
 
   // Round of 16 — only when all R32 results are in
-  if (!r32Complete) return bracket;
+  if (!r32Done) return bracket;
   bracket[89] = { home: getWinner(74), away: getWinner(77) };
   bracket[90] = { home: getWinner(73), away: getWinner(75) };
   bracket[91] = { home: getWinner(76), away: getWinner(78) };
@@ -2126,19 +2152,19 @@ function computeBracket(results) {
   bracket[96] = { home: getWinner(85), away: getWinner(87) };
 
   // Quarter-Finals — only when all R16 results are in
-  if (!r16Complete) return bracket;
+  if (!r16Done) return bracket;
   bracket[97]  = { home: getWinner(89), away: getWinner(90) };
   bracket[98]  = { home: getWinner(93), away: getWinner(94) };
   bracket[99]  = { home: getWinner(91), away: getWinner(92) };
   bracket[100] = { home: getWinner(95), away: getWinner(96) };
 
   // Semi-Finals — only when all QF results are in
-  if (!qfComplete) return bracket;
+  if (!qfDone) return bracket;
   bracket[101] = { home: getWinner(97),  away: getWinner(98) };
   bracket[102] = { home: getWinner(99),  away: getWinner(100) };
 
   // Third Place + Final — only when both SF results are in
-  if (!sfComplete) return bracket;
+  if (!sfDone) return bracket;
   bracket[103] = { home: getLoser(101), away: getLoser(102) };
   bracket[104] = { home: getWinner(101), away: getWinner(102) };
 
@@ -2150,8 +2176,8 @@ let _computedBracket = {};
 let _predictedBracket = {};
 
 function refreshBracket() {
-  try { _computedBracket  = computeBracket(matchResults);  } catch(e){ _computedBracket={}; }
-  try { _predictedBracket = computeBracket(myPredictions); } catch(e){ _predictedBracket={}; }
+  try { _computedBracket  = computeBracket(matchResults, false);  } catch(e){ _computedBracket={}; }
+  try { _predictedBracket = computeBracket(myPredictions, true);  } catch(e){ _predictedBracket={}; }
 }
 
 
@@ -2175,11 +2201,16 @@ let playerConfirmations = new Set();
 async function loadConfirmations() {
   if (!currentUser) { playerConfirmations = new Set(); return; }
   try {
-    const token = _currentSession?.access_token || SUPABASE_KEY;
+    const token = await getAuthToken();
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/phase_confirmations?player_id=eq.${currentUser.id}&select=phase`,
       { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${token}` } }
     );
+    if (!res.ok) {
+      console.error('loadConfirmations HTTP error:', res.status, await res.text());
+      playerConfirmations = new Set();
+      return;
+    }
     const data = await res.json();
     const phases = (Array.isArray(data) ? data : []).map(r=>r.phase);
     playerConfirmations = new Set(phases);
@@ -2210,9 +2241,9 @@ async function confirmPhase(phaseKey) {
   showToast(`${phase.label} predictions confirmed! ✓`, 'success');
   renderMatches();
 
-  // Save to Supabase in background
+  // Save to Supabase — use refreshed token
   try {
-    const token = _currentSession?.access_token || SUPABASE_KEY;
+    const token = await getAuthToken();
     const res = await fetch(`${SUPABASE_URL}/rest/v1/phase_confirmations`, {
       method: 'POST',
       headers: {
@@ -2223,9 +2254,13 @@ async function confirmPhase(phaseKey) {
       },
       body: JSON.stringify({ player_id: currentUser.id, phase: phaseKey })
     });
-    if (!res.ok && res.status !== 201 && res.status !== 204) {
-      console.error('Confirmation save failed:', res.status, await res.text());
-      showToast('Warning: confirmation may not have saved — please refresh to verify', 'error');
+    if (res.ok || res.status === 201 || res.status === 204) {
+      console.log('Confirmation saved to Supabase:', phaseKey);
+    } else {
+      const errText = await res.text();
+      console.error('Confirmation save failed:', res.status, errText);
+      // Still show success toast (optimistic), but warn in console
+      showToast('⚠️ Confirmation may not persist after refresh — sign out and back in to verify', 'error');
     }
   } catch(e) {
     console.error('Confirmation network error:', e);
