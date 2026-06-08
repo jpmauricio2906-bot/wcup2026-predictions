@@ -715,6 +715,7 @@ function renderMatches() {
     return;
   }
 
+  _renderedBanners = new Set(); // reset per render pass
   const grouped={};
   for(const m of MATCHES){
     const inFilter=activePhaseFilter==='Group Stage'?!!m.group:m.phase===activePhaseFilter;
@@ -738,9 +739,18 @@ function renderMatches() {
     </div>`;
   }
 
-  // Map display phase name -> phase key
+  // Sort groups alphabetically, keep knockout phases in order
   const phaseKeyMap = {'Group Stage':'group','Round of 32':'r32','Round of 16':'r16','Quarter-Finals':'qf','Semi-Finals':'sf','Third Place':'final','Final':'final'};
-  html+=Object.entries(grouped).map(([phase,matches])=>{
+  const knockoutOrder = ['Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
+  const sortedEntries = Object.entries(grouped).sort(([a],[b]) => {
+    const aIsGroup = a.startsWith('Group ');
+    const bIsGroup = b.startsWith('Group ');
+    if (aIsGroup && bIsGroup) return a.localeCompare(b); // A,B,C...
+    if (aIsGroup) return -1;
+    if (bIsGroup) return 1;
+    return knockoutOrder.indexOf(a) - knockoutOrder.indexOf(b);
+  });
+  html+=sortedEntries.map(([phase,matches])=>{
     const pk = phaseKeyMap[phase] || 'group';
     return renderPhaseSection(phase, matches, pk);
   }).join('');
@@ -1890,8 +1900,9 @@ function computeBracket(results) {
   const best8  = thirdPlaced.slice(0, 8);
   const groupsWithResults = 'ABCDEFGHIJKL'.split('').filter(grpHasRes);
 
-  // Only look up AssignThird when all 12 groups have results (full group stage done)
-  const comboKey = groupsWithResults.length === 12
+  // Look up AssignThird only when we have exactly 8+ groups with results
+  // (need 8 to fill all 8 third-place slots)
+  const comboKey = best8.length === 8
     ? best8.map(t => t.group).sort().join('') : '';
   const slots = comboKey ? (ASSIGN_THIRD[comboKey] || null) : null;
 
@@ -2102,43 +2113,55 @@ function phaseFillCount(phaseKey) {
   return { filled, total: phase.matchIds.length };
 }
 
-function renderPhaseSection(phaseLabel, matches, phaseKey) {
-  const confirmed   = playerConfirmations.has(phaseKey);
-  const editable    = isPhaseEditable(phaseKey);
-  const visible     = isPhaseVisible(phaseKey);
+function renderPhaseBanner(phaseKey) {
+  // Only render banner once per phase key, not per group sub-section
+  if (!currentProfile) return '';
+  const confirmed = playerConfirmations.has(phaseKey);
+  const editable  = isPhaseEditable(phaseKey);
+  const visible   = isPhaseVisible(phaseKey);
+  const phase     = PHASES.find(p=>p.key===phaseKey);
   const {filled, total} = phaseFillCount(phaseKey);
-  const allFilled   = filled === total;
+  const allFilled = filled === total;
 
-  let banner = '';
-  if (!currentProfile) {
-    // not logged in — no banner
-  } else if (confirmed) {
-    banner = `<div class="phase-banner phase-banner-locked">
-      🔒 ${phaseLabel} predictions confirmed &nbsp;·&nbsp; ${filled}/${total} filled
+  if (confirmed) {
+    return `<div class="phase-banner phase-banner-locked" id="banner-${phaseKey}">
+      🔒 ${phase?.label} locked — ${filled}/${total} predictions confirmed ✓
     </div>`;
-  } else if (!visible) {
-    banner = `<div class="phase-banner phase-banner-locked">
-      🔒 Complete &amp; confirm ${PHASES[PHASE_ORDER.indexOf(phaseKey)-1]?.label||'previous phase'} to unlock this phase
-    </div>`;
-  } else if (editable) {
-    if (allFilled) {
-      banner = `<div class="phase-banner phase-banner-ready">
-        ✅ All ${total} predictions filled!
-        <button class="btn btn-primary" style="padding:6px 16px;font-size:12px;margin-left:12px"
-          onclick="confirmPhase('${phaseKey}')">Confirm & Lock ${phaseLabel} →</button>
-      </div>`;
-    } else {
-      const pct = Math.round((filled/total)*100);
-      banner = `<div class="phase-banner phase-banner-open">
-        <span>🔮 ${phaseLabel} — ${filled}/${total} filled</span>
-        <div style="flex:1;margin:0 12px;height:4px;background:var(--card-border);border-radius:2px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
-        </div>
-        <span style="font-size:12px;color:var(--accent)">${pct}%</span>
-      </div>`;
-    }
   }
+  if (!visible) {
+    const prevLabel = PHASES[PHASE_ORDER.indexOf(phaseKey)-1]?.label || 'previous phase';
+    return `<div class="phase-banner phase-banner-locked" id="banner-${phaseKey}">
+      🔒 Confirm <strong>${prevLabel}</strong> to unlock this phase
+    </div>`;
+  }
+  if (!editable) return '';
+  if (allFilled) {
+    return `<div class="phase-banner phase-banner-ready" id="banner-${phaseKey}">
+      ✅ All ${total} predictions filled!
+      <button class="btn btn-primary" style="padding:6px 16px;font-size:12px;margin-left:12px"
+        onclick="confirmPhase('${phaseKey}')">Confirm &amp; Lock ${phase?.label} →</button>
+    </div>`;
+  }
+  const pct = Math.round((filled/total)*100);
+  return `<div class="phase-banner phase-banner-open" id="banner-${phaseKey}">
+    <span>🔮 ${phase?.label} — ${filled}/${total} filled</span>
+    <div style="flex:1;margin:0 12px;height:4px;background:var(--card-border);border-radius:2px;overflow:hidden">
+      <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
+    </div>
+    <span style="font-size:12px;color:var(--accent)">${pct}%</span>
+  </div>`;
+}
 
+// Track which phase banners have been rendered this pass
+let _renderedBanners = new Set();
+
+function renderPhaseSection(phaseLabel, matches, phaseKey) {
+  // Show banner only once per unique phaseKey per render pass
+  let banner = '';
+  if (!_renderedBanners.has(phaseKey)) {
+    banner = renderPhaseBanner(phaseKey);
+    _renderedBanners.add(phaseKey);
+  }
   return `<div class="phase-section">
     <div class="phase-title">${phaseLabel}</div>
     ${banner}
