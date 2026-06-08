@@ -569,8 +569,11 @@ async function doRegister() {
   if (pass !== pass2)   { showErr(errEl, 'Passwords do not match'); return; }
 
   // Check name not taken
-  const { data: existing } = await sb.from('player_profiles').select('id').eq('display_name', name);
-  if (existing && existing.length > 0) { showErr(errEl, 'That display name is already taken'); return; }
+  const chkRes = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles?display_name=eq.${encodeURIComponent(name)}&select=id`, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  });
+  const existing = await chkRes.json();
+  if (Array.isArray(existing) && existing.length > 0) { showErr(errEl, 'That display name is already taken'); return; }
 
   btn.disabled = true; btn.textContent = 'Creating…';
   const { data, error } = await sb.auth.signUp({
@@ -582,7 +585,12 @@ async function doRegister() {
 
   // Create profile row
   if (data.user) {
-    await sb.from('player_profiles').insert({ id: data.user.id, display_name: name, is_admin: false });
+    const tok = data.session?.access_token || data.access_token;
+    await fetch(`${SUPABASE_URL}/rest/v1/player_profiles`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${tok||SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ id: data.user.id, display_name: name, is_admin: false })
+    });
   }
   closeModal();
   showToast(`Welcome, ${name}! 🎉 Check your email to confirm your account.`, 'success');
@@ -632,19 +640,28 @@ async function doSignOut() {
 
 async function loadProfile() {
   if (!currentUser) return;
-  const { data } = await sb.from('player_profiles').select('*').eq('id', currentUser.id).single();
-  if (data) {
-    currentProfile = data;
-  } else {
-    // Profile doesn't exist yet — create it from auth metadata
-    const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || 'Player';
-    const { data: created } = await sb.from('player_profiles')
-      .insert({ id: currentUser.id, display_name: name, is_admin: false })
-      .select().single();
-    currentProfile = created;
-  }
+  try {
+    const token = await getAuthToken();
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${token}` };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles?id=eq.${currentUser.id}&select=*`, { headers });
+    const rows = await res.json();
+    if (Array.isArray(rows) && rows.length > 0) {
+      currentProfile = rows[0];
+    } else {
+      // Create profile
+      const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || 'Player';
+      const cr = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+        body: JSON.stringify({ id: currentUser.id, display_name: name, is_admin: false })
+      });
+      const created = await cr.json();
+      currentProfile = Array.isArray(created) ? created[0] : created;
+    }
+  } catch(e) { console.error('loadProfile error', e); }
   myPredictions = await loadMyPredictions();
   matchResults   = await loadMatchResults();
+  await loadConfirmations();
   refreshBracket();
   if (currentProfile?.is_admin) addAdminTab();
   else removeAdminTab();
@@ -652,26 +669,37 @@ async function loadProfile() {
 
 async function loadMyPredictions() {
   if (!currentUser) return {};
-  const { data } = await sb.from('predictions').select('match_id,home_score,away_score,home_pen,away_pen').eq('player_id', currentUser.id);
-  if (!data) return {};
-  const map = {};
-  for (const r of data) map[r.match_id] = {
-    home: r.home_score, away: r.away_score,
-    home_pen: r.home_pen ?? null, away_pen: r.away_pen ?? null
-  };
-  return map;
+  try {
+    const token = await getAuthToken();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?player_id=eq.${currentUser.id}&select=match_id,home_score,away_score,home_pen,away_pen`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!Array.isArray(data)) return {};
+    const map = {};
+    for (const r of data) map[r.match_id] = {
+      home: r.home_score, away: r.away_score,
+      home_pen: r.home_pen ?? null, away_pen: r.away_pen ?? null
+    };
+    return map;
+  } catch(e) { return {}; }
 }
 
 async function loadMatchResults() {
-  const { data } = await sb.from('match_results').select('match_id,home_score,away_score,home_pen,away_pen');
-  if (!data) return {};
-  const map = {};
-  for (const r of data) map[r.match_id] = {
-    home: r.home_score, away: r.away_score,
-    home_pen: r.home_pen ?? null, away_pen: r.away_pen ?? null,
-    isKnockout: r.match_id >= 73
-  };
-  return map;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/match_results?select=match_id,home_score,away_score,home_pen,away_pen`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    if (!Array.isArray(data)) return {};
+    const map = {};
+    for (const r of data) map[r.match_id] = {
+      home: r.home_score, away: r.away_score,
+      home_pen: r.home_pen ?? null, away_pen: r.away_pen ?? null,
+      isKnockout: r.match_id >= 73
+    };
+    return map;
+  } catch(e) { return {}; }
 }
 
 // ===== AUTH BAR =====
@@ -1014,12 +1042,12 @@ async function onPenScore(matchId) {
   myPredictions[matchId].away_pen = ap;
   clearTimeout(saveTimers[`pen-${matchId}`]);
   saveTimers[`pen-${matchId}`] = setTimeout(async()=>{
-    await sb.from('predictions').upsert({
-      player_id: currentUser.id, match_id: matchId,
-      home_score: myPredictions[matchId].home,
-      away_score: myPredictions[matchId].away,
-      home_pen: hp, away_pen: ap
-    },{onConflict:'player_id,match_id'});
+    const penToken = await getAuthToken();
+    await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${penToken}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({player_id:currentUser.id,match_id:matchId,home_score:myPredictions[matchId].home,away_score:myPredictions[matchId].away,home_pen:hp,away_pen:ap})
+    });
     try{_predictedBracket=computeBracket(myPredictions,true);}catch(e){}
   }, 600);
 }
@@ -1043,9 +1071,13 @@ function onScore(matchId) {
       home_pen: myPredictions[matchId]?.home_pen ?? null,
       away_pen: myPredictions[matchId]?.away_pen ?? null
     } : {};
-    const {error}=await sb.from('predictions').upsert({
-      player_id:currentUser.id, match_id:matchId, home_score:hi, away_score:ai, ...penData
-    },{onConflict:'player_id,match_id'});
+    const token = await getAuthToken();
+    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/predictions`, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({player_id:currentUser.id,match_id:matchId,home_score:hi,away_score:ai,...penData})
+    });
+    const error = upsertRes.ok ? null : {message: await upsertRes.text()};
     if(!error&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
     const cnt=Object.keys(myPredictions).length;
     document.getElementById('authPredCount').textContent=`${cnt} predictions saved`;
@@ -1059,16 +1091,17 @@ function onScore(matchId) {
 async function renderLeaderboard() {
   const container=document.getElementById('leaderboardContainer');
   container.innerHTML='<div class="loading"><div class="spinner"></div>Loading…</div>';
-  const [{data:profiles},{data:allPreds},{data:results}]=await Promise.all([
-    sb.from('player_profiles').select('id,display_name,is_admin').order('display_name'),
-    sb.from('predictions').select('player_id,match_id,home_score,away_score'),
-    sb.from('match_results').select('match_id,home_score,away_score')
+  const [profRes, predRes, resRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/player_profiles?select=id,display_name,is_admin&order=display_name`, {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}),
+    fetch(`${SUPABASE_URL}/rest/v1/predictions?select=player_id,match_id,home_score,away_score`, {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}),
+    fetch(`${SUPABASE_URL}/rest/v1/match_results?select=match_id,home_score,away_score`, {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}})
   ]);
+  const [profiles, allPreds, results] = await Promise.all([profRes.json(), predRes.json(), resRes.json()]);
   const resMap={};
-  for(const r of (results||[])) resMap[r.match_id]={home:r.home_score,away:r.away_score};
-  const players=(profiles||[]).filter(p=>!p.is_admin);
+  for(const r of (Array.isArray(results)?results:[])) resMap[r.match_id]={home:r.home_score,away:r.away_score};
+  const players=(Array.isArray(profiles)?profiles:[]).filter(p=>!p.is_admin);
   const scoreboard=players.map(p=>{
-    const preds=(allPreds||[]).filter(x=>x.player_id===p.id);
+    const preds=(Array.isArray(allPreds)?allPreds:[]).filter(x=>x.player_id===p.id);
     let total=0,exact=0,correct=0;
     for(const pr of preds){
       const pts=calcPts({home:pr.home_score,away:pr.away_score},resMap[pr.match_id]);
@@ -1149,7 +1182,8 @@ async function renderAdmin() {
   const container=document.getElementById('adminContainer');
   container.innerHTML='<div class="loading"><div class="spinner"></div>Loading admin…</div>';
   matchResults=await loadMatchResults();
-  const {data:players}=await sb.from('player_profiles').select('id,display_name,is_admin').order('display_name');
+  const _apRes=await fetch(`${SUPABASE_URL}/rest/v1/player_profiles?select=id,display_name,is_admin&order=display_name`,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});
+  const players=await _apRes.json();
   const phases=['Group Stage','Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
   const phaseMap={};
   for(const m of MATCHES){const ph=m.group?'Group Stage':m.phase;if(!phaseMap[ph])phaseMap[ph]=[];phaseMap[ph].push(m);}
@@ -1237,10 +1271,13 @@ async function saveResult(matchId) {
     const ap=parseInt(document.getElementById(`rap-${matchId}`)?.value);
     if(!isNaN(hp)&&!isNaN(ap)&&hp>=0&&ap>=0&&hp!==ap){homePen=hp;awayPen=ap;}
   }
-  const {error}=await sb.from('match_results').upsert(
-    {match_id:matchId,home_score:h,away_score:a,home_pen:homePen,away_pen:awayPen},
-    {onConflict:'match_id'}
-  );
+  const admToken = await getAuthToken();
+  const _srRes = await fetch(`${SUPABASE_URL}/rest/v1/match_results`,{
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${admToken}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({match_id:matchId,home_score:h,away_score:a,home_pen:homePen,away_pen:awayPen})
+  });
+  const error = _srRes.ok ? null : {message: await _srRes.text()};
   if(!error){
     matchResults[matchId]={home:h,away:a,home_pen:homePen,away_pen:awayPen,isKnockout:matchId>=73};
     try{refreshBracket();}catch(e){}
@@ -1251,7 +1288,12 @@ async function saveResult(matchId) {
 
 async function deleteResult(matchId) {
   if(!confirm('Remove this result?'))return;
-  const {error}=await sb.from('match_results').delete().eq('match_id',matchId);
+  const _drToken = await getAuthToken();
+  const _drRes = await fetch(`${SUPABASE_URL}/rest/v1/match_results?match_id=eq.${matchId}`,{
+    method:'DELETE',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${_drToken}`,'Prefer':'return=minimal'}
+  });
+  const error = (_drRes.ok||_drRes.status===204) ? null : {message:'delete failed'};
   if(!error){delete matchResults[matchId];refreshBracket();showToast('Result removed','');renderAdmin();}
 }
 
