@@ -561,6 +561,175 @@ let matchResults = {};
 let saveTimers = {};
 let activePhaseFilter = 'Group Stage';
 
+
+// ===== TOURNAMENT STRUCTURE FROM SUPABASE =====
+// The Excel-derived structure is stored in wc2026_* tables.  The hard-coded
+// objects below remain as a safe fallback, but init() tries to replace them
+// with database rows before rendering anything.
+let tournamentStructureLoaded = false;
+let MATCH_SIDES = {};          // match_id -> {home: sideRule, away: sideRule}
+let THIRD_ASSIGN_RULES = {};   // qualified_third_groups -> { slot_code -> assigned_group }
+let GROUP_SLOT_TEAMS = {};     // slot_code, e.g. A1 -> team_id
+
+function clearObject(obj) {
+  for (const k of Object.keys(obj)) delete obj[k];
+}
+
+async function fetchStructureTable(table, select='*', order='') {
+  const rows = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    let url = `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}&limit=${pageSize}&offset=${offset}`;
+    if (order) url += `&order=${encodeURIComponent(order)}`;
+    const res = await fetch(url, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    if (!res.ok) throw new Error(`${table}: ${res.status} ${await res.text()}`);
+    const batch = await res.json();
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+  return rows;
+}
+
+function stageLabelFromKey(stageKey) {
+  return ({
+    group: 'Group Stage',
+    r32: 'Round of 32',
+    r16: 'Round of 16',
+    qf: 'Quarter-Finals',
+    sf: 'Semi-Finals',
+    third: 'Third Place',
+    final: 'Final'
+  })[stageKey] || stageKey;
+}
+
+function dateTimeFromKickoff(kickoffHost) {
+  if (!kickoffHost) return { date: '', time: '' };
+  const raw = String(kickoffHost).replace(' ', 'T');
+  const [date, timeRaw=''] = raw.split('T');
+  return { date, time: timeRaw.slice(0,5) };
+}
+
+async function loadTournamentStructureFromDatabase() {
+  try {
+    const [teams, groupSlots, matches, sides, thirdRules] = await Promise.all([
+      fetchStructureTable('wc2026_teams', 'team_id,team_name,fifa_rank', 'team_id.asc'),
+      fetchStructureTable('wc2026_group_slots', 'slot_code,group_code,group_position,team_id', 'slot_code.asc'),
+      fetchStructureTable('wc2026_matches', 'match_id,stage_key,stage_order,round_order,round_label,kickoff_host,venue_id,excel_row', 'match_id.asc'),
+      fetchStructureTable('wc2026_match_sides', 'match_id,side,slot_code,source_type,source_group,source_rank,source_position,source_match_id,third_place_slot_code', 'match_id.asc,side.asc'),
+      fetchStructureTable('wc2026_third_place_assignment_rules', 'qualified_third_groups,slot_code,assigned_group', 'qualified_third_groups.asc,slot_code.asc')
+    ]);
+
+    if (!teams.length || !groupSlots.length || matches.length < 104 || sides.length < 208) {
+      throw new Error('Tournament structure tables are incomplete.');
+    }
+
+    // Teams and rankings
+    clearObject(TEAMS);
+    clearObject(FIFA_RANK);
+    for (const t of teams) {
+      TEAMS[Number(t.team_id)] = t.team_name;
+      if (t.fifa_rank != null) FIFA_RANK[Number(t.team_id)] = Number(t.fifa_rank);
+    }
+
+    // Group slots and group team rosters
+    clearObject(GROUP_SLOT_TEAMS);
+    clearObject(GROUP_TEAMS);
+    for (const gs of groupSlots.sort((a,b)=>String(a.group_code).localeCompare(String(b.group_code)) || Number(a.group_position)-Number(b.group_position))) {
+      GROUP_SLOT_TEAMS[gs.slot_code] = Number(gs.team_id);
+      if (!GROUP_TEAMS[gs.group_code]) GROUP_TEAMS[gs.group_code] = [];
+      GROUP_TEAMS[gs.group_code][Number(gs.group_position)-1] = Number(gs.team_id);
+    }
+
+    // Match side rules
+    MATCH_SIDES = {};
+    for (const side of sides) {
+      const mid = Number(side.match_id);
+      if (!MATCH_SIDES[mid]) MATCH_SIDES[mid] = {};
+      MATCH_SIDES[mid][side.side] = {
+        match_id: mid,
+        side: side.side,
+        slot_code: side.slot_code,
+        source_type: side.source_type,
+        source_group: side.source_group,
+        source_rank: side.source_rank == null ? null : Number(side.source_rank),
+        source_position: side.source_position == null ? null : Number(side.source_position),
+        source_match_id: side.source_match_id == null ? null : Number(side.source_match_id),
+        third_place_slot_code: side.third_place_slot_code
+      };
+    }
+
+    // Third-place assignment rules: combination -> slot-code -> group-code
+    THIRD_ASSIGN_RULES = {};
+    for (const r of thirdRules) {
+      if (!THIRD_ASSIGN_RULES[r.qualified_third_groups]) THIRD_ASSIGN_RULES[r.qualified_third_groups] = {};
+      THIRD_ASSIGN_RULES[r.qualified_third_groups][r.slot_code] = r.assigned_group;
+    }
+
+    // Rebuild MATCHES from the database.  This keeps the rest of the app using
+    // the same object shape it already expects.
+    MATCHES.length = 0;
+    clearObject(GROUP_MATCHES);
+    clearObject(GROUP_MATCH_TEAMS);
+
+    for (const m of matches.sort((a,b)=>Number(a.match_id)-Number(b.match_id))) {
+      const mid = Number(m.match_id);
+      const ms = MATCH_SIDES[mid] || {};
+      const {date, time} = dateTimeFromKickoff(m.kickoff_host);
+      const stageKey = m.stage_key;
+      const stageLabel = stageLabelFromKey(stageKey);
+
+      if (stageKey === 'group') {
+        const homeTeam = GROUP_SLOT_TEAMS[ms.home?.slot_code];
+        const awayTeam = GROUP_SLOT_TEAMS[ms.away?.slot_code];
+        const groupCode = ms.home?.source_group || String(ms.home?.slot_code || '').charAt(0);
+        MATCHES.push({ id: mid, group: groupCode, home: homeTeam, away: awayTeam, date, time });
+        if (!GROUP_MATCHES[groupCode]) GROUP_MATCHES[groupCode] = [];
+        GROUP_MATCHES[groupCode].push(mid);
+        GROUP_MATCH_TEAMS[mid] = { h: homeTeam, a: awayTeam };
+      } else {
+        MATCHES.push({
+          id: mid,
+          phase: stageLabel,
+          stage_key: stageKey,
+          label: `${ms.home?.slot_code || 'TBD'} vs ${ms.away?.slot_code || 'TBD'}`,
+          date,
+          time
+        });
+      }
+    }
+
+    // Keep phase definitions synchronized with the database rather than fixed
+    // ranges.  This matters if the workbook order ever changes.
+    for (const ph of PHASES) ph.matchIds.length = 0;
+    for (const m of MATCHES) {
+      const key = m.group ? 'group' : getPhaseKeyFromStageLabel(m.phase);
+      const ph = PHASES.find(p => p.key === key);
+      if (ph) ph.matchIds.push(m.id);
+    }
+
+    tournamentStructureLoaded = true;
+    console.log(`WCup 2026 structure loaded from Supabase: ${MATCHES.length} matches, ${Object.keys(MATCH_SIDES).length} side maps.`);
+  } catch (e) {
+    tournamentStructureLoaded = false;
+    console.warn('Using built-in tournament structure fallback:', e);
+  }
+}
+
+function getPhaseKeyFromStageLabel(label) {
+  return ({
+    'Group Stage': 'group',
+    'Round of 32': 'r32',
+    'Round of 16': 'r16',
+    'Quarter-Finals': 'qf',
+    'Semi-Finals': 'sf',
+    'Third Place': 'final',
+    'Final': 'final'
+  })[label] || 'group';
+}
+
 // ===== SUPABASE AUTH LISTENERS =====
 // Only use SDK listener for PASSWORD_RECOVERY (email reset links)
 // Session restore on refresh is handled manually in init()
@@ -1426,7 +1595,6 @@ async function init() {
   try { refreshBracket(); } catch(e) {}
   renderMatches();
 }
-init();
 
 
 // =====================================================
@@ -2132,141 +2300,98 @@ function computeGroupStandings(group, results) {
   });
 }
 
-// Compute bracket: returns { teamId } for each match slot
+// Compute bracket: returns {home: teamId, away: teamId} for each knockout match.
+// Primary path: use the Excel-derived match-side rules stored in Supabase.
+// Fallback path: the built-in structures are still present if the DB structure
+// cannot be loaded, but the normal deployed app should use MATCH_SIDES.
 function computeBracket(results, partial=false) {
   const bracket = {}; // matchId -> { home: teamId, away: teamId }
 
-  // Gate: phases unlock progressively based on actual computable winners.
-  // For predicted brackets (partial=true), this lets the next round show as soon as
-  // the relevant feeder matches have winners. For official brackets (partial=false),
-  // it waits for the previous phase to be fully resolved.
-  const R32_IDS = Array.from({length:16},(_,i)=>i+73);
-  const R16_IDS = Array.from({length:8}, (_,i)=>i+89);
-  const QF_IDS  = Array.from({length:4}, (_,i)=>i+97);
-  const SF_IDS  = [101,102];
-
-  // Step 1: compute all group standings
+  // Step 1: compute group standings from the supplied result set
   const groupStandings = {};
   for (const grp of 'ABCDEFGHIJKL'.split('')) {
-    groupStandings[grp] = computeGroupStandings(grp, results);
+    if (GROUP_TEAMS[grp]) groupStandings[grp] = computeGroupStandings(grp, results);
   }
 
-  // Only consider groups that have at least 1 result/prediction
-  const grpHasRes = g => Object.keys(results).some(id => GROUP_MATCHES[g]?.includes(parseInt(id)));
+  const groupMatchIds = g => GROUP_MATCHES[g] || [];
+  const grpHasRes = g => Object.keys(results).some(id => groupMatchIds(g).includes(parseInt(id)));
 
-  // Helpers — return null if group has no results yet
-  const get1st = g => grpHasRes(g) ? (groupStandings[g]?.[0]?.teamId || null) : null;
-  const get2nd = g => grpHasRes(g) ? (groupStandings[g]?.[1]?.teamId || null) : null;
+  const getGroupRankTeam = (groupCode, rank) => {
+    if (!groupCode || !rank) return null;
+    if (!grpHasRes(groupCode)) return null;
+    return groupStandings[groupCode]?.[Number(rank)-1]?.teamId || null;
+  };
 
-  // Step 2: collect 3rd place teams ONLY from groups with results
+  // Step 2: rank third-placed teams. The Excel file determines how the eight
+  // best third-placed groups are assigned to the specific R32 third-place slots.
   const thirdPlaced = 'ABCDEFGHIJKL'.split('')
-    .filter(grp => grpHasRes(grp))
+    .filter(grp => GROUP_TEAMS[grp] && grpHasRes(grp))
     .map(grp => ({
       group: grp,
-      teamId: groupStandings[grp][2]?.teamId,
-      pts:  groupStandings[grp][2]?.pts  || 0,
-      gd:   groupStandings[grp][2]?.gd   || 0,
-      gf:   groupStandings[grp][2]?.gf   || 0,
-      rank: FIFA_RANK[groupStandings[grp][2]?.teamId] || 99
-    })).filter(t => t.teamId);
+      teamId: groupStandings[grp]?.[2]?.teamId,
+      pts:  groupStandings[grp]?.[2]?.pts  || 0,
+      gd:   groupStandings[grp]?.[2]?.gd   || 0,
+      gf:   groupStandings[grp]?.[2]?.gf   || 0,
+      rank: FIFA_RANK[groupStandings[grp]?.[2]?.teamId] || 999
+    }))
+    .filter(t => t.teamId);
 
-  // Sort 3rd placed: pts > gd > gf > FIFA rank
-  thirdPlaced.sort((a,b) =>
-    b.pts-a.pts || b.gd-a.gd || b.gf-a.gf || a.rank-b.rank
-  );
+  thirdPlaced.sort((a,b) => b.pts-a.pts || b.gd-a.gd || b.gf-a.gf || a.rank-b.rank);
 
-  // Top 8 third placed teams — need exactly 8 groups with results to look up slots
-  const best8  = thirdPlaced.slice(0, 8);
-  const groupsWithResults = 'ABCDEFGHIJKL'.split('').filter(grpHasRes);
-
-  // Look up AssignThird only when we have exactly 8+ groups with results
-  // (need 8 to fill all 8 third-place slots)
-  const comboKey = best8.length === 8
-    ? best8.map(t => t.group).sort().join('') : '';
-  const slots = comboKey ? (ASSIGN_THIRD[comboKey] || null) : null;
-
-  // Map group letter -> teamId for 3rd placed
+  const best8 = thirdPlaced.slice(0, 8);
+  const comboKey = best8.length === 8 ? best8.map(t => t.group).sort().join('') : '';
+  const thirdRuleForCombo = comboKey ? (THIRD_ASSIGN_RULES[comboKey] || null) : null;
   const thirdByGroup = {};
   for (const t of thirdPlaced) thirdByGroup[t.group] = t.teamId;
-  const get3rd = k => slots && thirdByGroup[slots[k]] ? thirdByGroup[slots[k]] : null;
 
-  // Step 4: populate Round of 32 — structure taken from the official Excel workbook.
-  // 73: 2A vs 2B       | 74: 1E vs 3-ABCDF | 75: 1F vs 2C      | 76: 1C vs 2F
-  // 77: 1I vs 3-CDFGH  | 78: 2E vs 2I      | 79: 1A vs 3-CEFHI | 80: 1L vs 3-EHIJK
-  // 81: 1D vs 3-BEFIJ  | 82: 1G vs 3-AEHIJ | 83: 2K vs 2L      | 84: 1H vs 2J
-  // 85: 1B vs 3-EFGIJ  | 86: 1J vs 2H      | 87: 1K vs 3-DEIJL | 88: 2D vs 2G
-  const get3rdSlot = (slotCode) => get3rd('m' + slotCode);
-  bracket[73] = { home: get2nd('A'), away: get2nd('B') };
-  bracket[74] = { home: get1st('E'), away: get3rdSlot(74) };
-  bracket[75] = { home: get1st('F'), away: get2nd('C') };
-  bracket[76] = { home: get1st('C'), away: get2nd('F') };
-  bracket[77] = { home: get1st('I'), away: get3rdSlot(77) };
-  bracket[78] = { home: get2nd('E'), away: get2nd('I') };
-  bracket[79] = { home: get1st('A'), away: get3rdSlot(79) };
-  bracket[80] = { home: get1st('L'), away: get3rdSlot(80) };
-  bracket[81] = { home: get1st('D'), away: get3rdSlot(81) };
-  bracket[82] = { home: get1st('G'), away: get3rdSlot(82) };
-  bracket[83] = { home: get2nd('K'), away: get2nd('L') };
-  bracket[84] = { home: get1st('H'), away: get2nd('J') };
-  bracket[85] = { home: get1st('B'), away: get3rdSlot(85) };
-  bracket[86] = { home: get1st('J'), away: get2nd('H') };
-  bracket[87] = { home: get1st('K'), away: get3rdSlot(87) };
-  bracket[88] = { home: get2nd('D'), away: get2nd('G') };
+  const getThirdPlaceSlotTeam = (slotCode) => {
+    if (!slotCode || !thirdRuleForCombo) return null;
+    const assignedGroup = thirdRuleForCombo[slotCode];
+    return assignedGroup ? (thirdByGroup[assignedGroup] || null) : null;
+  };
 
-  // Step 5: populate later rounds from computable winners.
-  // Knockout matches may be tied after regulation; in that case a penalty winner is
-  // required before the next-round slot can be determined.
   const getWinner = (mid) => {
     const r = results[mid], b = bracket[mid];
-    if (!r || !b) return null;
-    if (!b.home || !b.away) return null; // both teams must be known for a real winner
-    const w = getMatchWinner(r, true); // true = knockout; penalties decide regulation draws
+    if (!r || !b || !b.home || !b.away) return null;
+    const w = getMatchWinner(r, true); // knockout draws require penalties
     return w === 'home' ? b.home : w === 'away' ? b.away : null;
   };
+
   const getLoser = (mid) => {
     const r = results[mid], b = bracket[mid];
     if (!r || !b || !b.home || !b.away) return null;
     const w = getMatchWinner(r, true);
     return w === 'home' ? b.away : w === 'away' ? b.home : null;
   };
-  const hasAnyWinner = ids => ids.some(id => !!getWinner(id));
-  const hasAllWinners = ids => ids.every(id => !!getWinner(id));
 
-  const r32Done = partial ? hasAnyWinner(R32_IDS) : hasAllWinners(R32_IDS);
-  const r16Done = partial ? hasAnyWinner(R16_IDS) : hasAllWinners(R16_IDS);
-  const qfDone  = partial ? hasAnyWinner(QF_IDS)  : hasAllWinners(QF_IDS);
-  const sfDone  = partial ? hasAnyWinner(SF_IDS)  : hasAllWinners(SF_IDS);
+  const resolveSide = (sideRule) => {
+    if (!sideRule) return null;
+    switch (sideRule.source_type) {
+      case 'group_draw_slot':
+        return GROUP_SLOT_TEAMS[sideRule.slot_code] || null;
+      case 'group_rank':
+        return getGroupRankTeam(sideRule.source_group, sideRule.source_rank);
+      case 'third_place_slot':
+        return getThirdPlaceSlotTeam(sideRule.third_place_slot_code || sideRule.slot_code);
+      case 'winner':
+        return getWinner(sideRule.source_match_id);
+      case 'runner_up':
+        return getLoser(sideRule.source_match_id);
+      default:
+        return null;
+    }
+  };
 
-  // Round of 16 — feeder structure from the official Excel workbook.
-  // 89: W74 vs W77 | 90: W73 vs W75 | 91: W76 vs W78 | 92: W79 vs W80
-  // 93: W83 vs W84 | 94: W81 vs W82 | 95: W86 vs W88 | 96: W85 vs W87
-  if (!r32Done) return bracket;
-  bracket[89] = { home: getWinner(74), away: getWinner(77) };
-  bracket[90] = { home: getWinner(73), away: getWinner(75) };
-  bracket[91] = { home: getWinner(76), away: getWinner(78) };
-  bracket[92] = { home: getWinner(79), away: getWinner(80) };
-  bracket[93] = { home: getWinner(83), away: getWinner(84) };
-  bracket[94] = { home: getWinner(81), away: getWinner(82) };
-  bracket[95] = { home: getWinner(86), away: getWinner(88) };
-  bracket[96] = { home: getWinner(85), away: getWinner(87) };
-
-  // Quarter-Finals — feeder structure from the official Excel workbook.
-  // 97: W89 vs W90 | 98: W93 vs W94 | 99: W91 vs W92 | 100: W95 vs W96
-  if (!r16Done) return bracket;
-  bracket[97]  = { home: getWinner(89), away: getWinner(90) };
-  bracket[98]  = { home: getWinner(93), away: getWinner(94) };
-  bracket[99]  = { home: getWinner(91), away: getWinner(92) };
-  bracket[100] = { home: getWinner(95), away: getWinner(96) };
-
-  // Semi-Finals — feeder structure from the official Excel workbook.
-  if (!qfDone) return bracket;
-  bracket[101] = { home: getWinner(97),  away: getWinner(98) };
-  bracket[102] = { home: getWinner(99),  away: getWinner(100) };
-
-  // Third Place + Final — only when both SF results are in
-  if (!sfDone) return bracket;
-  bracket[103] = { home: getLoser(101), away: getLoser(102) };
-  bracket[104] = { home: getWinner(101), away: getWinner(102) };
+  // Step 3: resolve all knockout matches directly from the database-side rules.
+  // The order by match_id is important: W74 is resolved before match 89, etc.
+  for (const m of MATCHES.filter(x => !x.group).sort((a,b)=>a.id-b.id)) {
+    const sides = MATCH_SIDES[m.id];
+    if (!sides) continue;
+    bracket[m.id] = {
+      home: resolveSide(sides.home),
+      away: resolveSide(sides.away)
+    };
+  }
 
   return bracket;
 }
@@ -2493,6 +2618,9 @@ function renderPhaseSection(phaseLabel, matches, phaseKey) {
     <div class="match-grid">${matches.map(m=>matchCard(m)).join('')}</div>
   </div>`;
 }
+
+// Start only after every helper/constant has been defined.
+init();
 
 </script>
 </body>
