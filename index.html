@@ -300,7 +300,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .bracket-team-row.winner{background:color-mix(in srgb, var(--correct-border) 14%, var(--card-bg) 86%);border-color:color-mix(in srgb, var(--correct-border) 26%, transparent);box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 4%, transparent);}
 .bracket-team-row.tbd{opacity:.82;}
 .bracket-team-main{display:flex;align-items:center;gap:8px;min-width:0;}
-.bracket-team-flag{width:32px;min-width:32px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--page-bg) 32%, var(--card-bg) 68%);font-size:18px;box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);flex:0 0 32px;}
+.bracket-team-flag{width:34px;min-width:34px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;flex:0 0 34px;border:1px solid color-mix(in srgb, var(--card-border) 55%, var(--page-text) 45%);box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);}
+.bracket-team-flag.visual-flag{background:linear-gradient(90deg,var(--flag-a,#d62828) 0 33%,var(--flag-b,#ffffff) 33% 66%,var(--flag-c,#003049) 66% 100%);}
+.bracket-team-flag.visual-flag::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(0,0,0,.08));pointer-events:none;}
+.bracket-team-flag-code{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:13px;padding:0 3px;border-radius:4px;background:rgba(0,0,0,.46);color:#fff;font-size:8px;line-height:1;font-weight:900;letter-spacing:.25px;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.45);}
+.bracket-team-emoji{display:none;}
 .bracket-team-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--bracket-strong);}
 .bracket-score-wrap{display:flex;align-items:center;gap:6px;justify-content:flex-end;}
 .bracket-score-box{min-width:28px;padding:4px 7px;border-radius:8px;background:color-mix(in srgb, var(--page-bg) 22%, var(--card-bg) 78%);border:1px solid var(--bracket-line);font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;color:var(--bracket-strong);text-align:center;}
@@ -345,9 +349,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .bracket-feature-title::after{background:linear-gradient(90deg, var(--bracket-line), transparent);}
 .bracket-title-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .bracket-poster-badge{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;border-radius:999px;background:color-mix(in srgb, var(--accent-bg) 40%, var(--card-bg) 60%);border:1px solid var(--bracket-line);color:var(--bracket-mode);font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;}
-.bracket-team-flag{position:relative;overflow:visible;border:1px solid color-mix(in srgb, var(--card-border) 60%, var(--page-text) 40%);}
-.bracket-team-emoji{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:18px;line-height:1;background:color-mix(in srgb, var(--card-bg) 72%, var(--page-bg) 28%);border-radius:6px;}
-.bracket-team-flag-code{position:absolute;right:-4px;bottom:-5px;font-size:7px;line-height:1;padding:1px 3px;border-radius:4px;background:color-mix(in srgb, var(--page-bg) 82%, var(--card-bg) 18%);color:var(--text-muted);letter-spacing:.2px;font-weight:800;text-transform:uppercase;border:1px solid var(--card-border);}
+.bracket-team-flag{width:34px;min-width:34px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;flex:0 0 34px;border:1px solid color-mix(in srgb, var(--card-border) 55%, var(--page-text) 45%);box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);}
+.bracket-team-flag.visual-flag{background:linear-gradient(90deg,var(--flag-a,#d62828) 0 33%,var(--flag-b,#ffffff) 33% 66%,var(--flag-c,#003049) 66% 100%);}
+.bracket-team-flag.visual-flag::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(0,0,0,.08));pointer-events:none;}
+.bracket-team-flag-code{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:13px;padding:0 3px;border-radius:4px;background:rgba(0,0,0,.46);color:#fff;font-size:8px;line-height:1;font-weight:900;letter-spacing:.25px;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.45);}
+.bracket-team-emoji{display:none;}
 @media(max-width:980px){.bracket-actions{width:100%;justify-content:space-between}.bracket-board-wrap{min-width:1520px}}
 @media(max-width:600px){.bracket-export-btn{padding:8px 10px;font-size:12px}}
 
@@ -663,6 +669,29 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
 const TEAMS={1:"France",2:"Spain",3:"Argentina",4:"England",5:"Portugal",6:"Brazil",7:"Netherlands",8:"Morocco",9:"Belgium",10:"Germany",11:"Croatia",12:"Italy",13:"Colombia",14:"Senegal",15:"Mexico",16:"USA",17:"Uruguay",18:"Japan",19:"Switzerland",20:"Denmark",21:"IR Iran",22:"Turkey",23:"Ecuador",24:"Austria",25:"Rep. of Korea",26:"Nigeria",27:"Australia",28:"Algeria",29:"Egypt",30:"Canada",31:"Norway",32:"Ukraine",33:"Panama",34:"Ivory Coast",35:"Poland",36:"Russia",37:"Wales",38:"Sweden",39:"Serbia",40:"Paraguay",41:"Czech Rep.",42:"Hungary",43:"Scotland",44:"Tunisia",45:"Cameroon",46:"DR Congo",47:"Greece",48:"Slovakia",49:"Venezuela",50:"Uzbekistan",51:"Costa Rica",52:"Mali",53:"Peru",54:"Chile",55:"Qatar",56:"Romania",57:"Iraq",58:"Slovenia",60:"South Africa",61:"Saudi Arabia",62:"Burkina Faso",63:"Jordan",64:"Albania",65:"Bosnia/Herzeg.",66:"Honduras",69:"Cape Verde",70:"Northern Ireland",71:"Jamaica",72:"Georgia",73:"Finland",74:"Ghana",75:"Iceland",76:"Bolivia",77:"Israel",79:"Oman",81:"Montenegro",82:"Curaçao",83:"Haiti",85:"New Zealand",86:"Bulgaria"};
 const FLAGS={1:"🇫🇷",2:"🇪🇸",3:"🇦🇷",4:"🏴󠁧󠁢󠁥󠁮󠁧󠁿",5:"🇵🇹",6:"🇧🇷",7:"🇳🇱",8:"🇲🇦",9:"🇧🇪",10:"🇩🇪",11:"🇭🇷",12:"🇮🇹",13:"🇨🇴",14:"🇸🇳",15:"🇲🇽",16:"🇺🇸",17:"🇺🇾",18:"🇯🇵",19:"🇨🇭",20:"🇩🇰",21:"🇮🇷",22:"🇹🇷",23:"🇪🇨",24:"🇦🇹",25:"🇰🇷",26:"🇳🇬",27:"🇦🇺",28:"🇩🇿",29:"🇪🇬",30:"🇨🇦",31:"🇳🇴",32:"🇺🇦",33:"🇵🇦",34:"🇨🇮",35:"🇵🇱",36:"🇷🇺",37:"🏴󠁧󠁢󠁷󠁬󠁳󠁿",38:"🇸🇪",39:"🇷🇸",40:"🇵🇾",41:"🇨🇿",42:"🇭🇺",43:"🏴󠁧󠁢󠁳󠁣󠁴󠁿",44:"🇹🇳",45:"🇨🇲",46:"🇨🇩",47:"🇬🇷",48:"🇸🇰",49:"🇻🇪",50:"🇺🇿",51:"🇨🇷",52:"🇲🇱",53:"🇵🇪",54:"🇨🇱",55:"🇶🇦",56:"🇷🇴",57:"🇮🇶",58:"🇸🇮",60:"🇿🇦",61:"🇸🇦",62:"🇧🇫",63:"🇯🇴",64:"🇦🇱",65:"🇧🇦",66:"🇭🇳",69:"🇨🇻",70:"🇬🇧",71:"🇯🇲",72:"🇬🇪",73:"🇫🇮",74:"🇬🇭",75:"🇮🇸",76:"🇧🇴",77:"🇮🇱",79:"🇴🇲",81:"🇲🇪",82:"🇨🇼",83:"🇭🇹",85:"🇳🇿",86:"🇧🇬"};
 const FLAG_CODES={1:"fr",2:"es",3:"ar",4:"gb-eng",5:"pt",6:"br",7:"nl",8:"ma",9:"be",10:"de",11:"hr",12:"it",13:"co",14:"sn",15:"mx",16:"us",17:"uy",18:"jp",19:"ch",20:"dk",21:"ir",22:"tr",23:"ec",24:"at",25:"kr",26:"ng",27:"au",28:"dz",29:"eg",30:"ca",31:"no",32:"ua",33:"pa",34:"ci",35:"pl",36:"ru",37:"gb-wls",38:"se",39:"rs",40:"py",41:"cz",42:"hu",43:"gb-sct",44:"tn",45:"cm",46:"cd",47:"gr",48:"sk",49:"ve",50:"uz",51:"cr",52:"ml",53:"pe",54:"cl",55:"qa",56:"ro",57:"iq",58:"si",60:"za",61:"sa",62:"bf",63:"jo",64:"al",65:"ba",66:"hn",69:"cv",70:"gb-nir",71:"jm",72:"ge",73:"fi",74:"gh",75:"is",76:"bo",77:"il",79:"om",81:"me",82:"cw",83:"ht",85:"nz",86:"bg"};
+
+const FLAG_COLORS={
+  1:["#0055A4","#FFFFFF","#EF4135"],2:["#AA151B","#F1BF00","#AA151B"],3:["#75AADB","#FFFFFF","#75AADB"],4:["#FFFFFF","#CE1124","#00247D"],
+  5:["#006600","#FF0000","#FFD100"],6:["#009B3A","#FFDF00","#002776"],7:["#AE1C28","#FFFFFF","#21468B"],8:["#C1272D","#006233","#C1272D"],
+  9:["#000000","#FAE042","#ED2939"],10:["#000000","#DD0000","#FFCE00"],11:["#FF0000","#FFFFFF","#171796"],12:["#009246","#FFFFFF","#CE2B37"],
+  13:["#FCD116","#003893","#CE1126"],14:["#00853F","#FDEF42","#E31B23"],15:["#006847","#FFFFFF","#CE1126"],16:["#B22234","#FFFFFF","#3C3B6E"],
+  17:["#0038A8","#FFFFFF","#FCD116"],18:["#FFFFFF","#BC002D","#FFFFFF"],19:["#D52B1E","#FFFFFF","#D52B1E"],20:["#C60C30","#FFFFFF","#C60C30"],
+  21:["#239F40","#FFFFFF","#DA0000"],22:["#E30A17","#FFFFFF","#E30A17"],23:["#FCD116","#003893","#CE1126"],24:["#ED2939","#FFFFFF","#ED2939"],
+  25:["#FFFFFF","#C60C30","#003478"],26:["#008751","#FFFFFF","#008751"],27:["#00008B","#FFFFFF","#E4002B"],28:["#006233","#FFFFFF","#D21034"],
+  29:["#CE1126","#FFFFFF","#000000"],30:["#FF0000","#FFFFFF","#FF0000"],31:["#BA0C2F","#FFFFFF","#00205B"],32:["#0057B7","#FFD700","#0057B7"],
+  33:["#005293","#FFFFFF","#D21034"],34:["#F77F00","#FFFFFF","#009E60"],35:["#FFFFFF","#DC143C","#FFFFFF"],36:["#FFFFFF","#0039A6","#D52B1E"],
+  37:["#FFFFFF","#C8102E","#00AD36"],38:["#006AA7","#FECC00","#006AA7"],39:["#C6363C","#0C4076","#FFFFFF"],40:["#D52B1E","#FFFFFF","#0038A8"],
+  41:["#FFFFFF","#D7141A","#11457E"],42:["#CE2939","#FFFFFF","#477050"],43:["#005EB8","#FFFFFF","#005EB8"],44:["#E70013","#FFFFFF","#E70013"],
+  45:["#007A5E","#CE1126","#FCD116"],46:["#007FFF","#F7D618","#CE1021"],47:["#0D5EAF","#FFFFFF","#0D5EAF"],48:["#FFFFFF","#0B4EA2","#EE1C25"],
+  49:["#FCD116","#003893","#CE1126"],50:["#1EB53A","#FFFFFF","#0099B5"],51:["#002B7F","#FFFFFF","#CE1126"],52:["#14B53A","#FCD116","#CE1126"],
+  53:["#D91023","#FFFFFF","#D91023"],54:["#0039A6","#FFFFFF","#D52B1E"],55:["#8A1538","#FFFFFF","#8A1538"],56:["#002B7F","#FCD116","#CE1126"],
+  57:["#CE1126","#FFFFFF","#000000"],58:["#FFFFFF","#005DA4","#ED1C24"],60:["#007A4D","#FFFFFF","#DE3831"],61:["#006C35","#FFFFFF","#006C35"],
+  62:["#EF2B2D","#FCD116","#009E49"],63:["#000000","#FFFFFF","#007A3D"],64:["#E41E20","#000000","#E41E20"],65:["#002395","#FECB00","#002395"],
+  66:["#0073CF","#FFFFFF","#0073CF"],69:["#003893","#FFFFFF","#CF2027"],70:["#FFFFFF","#C8102E","#0033A0"],71:["#009B3A","#FED100","#000000"],
+  72:["#FFFFFF","#FF0000","#FFFFFF"],73:["#FFFFFF","#002F6C","#FFFFFF"],74:["#CE1126","#FCD116","#006B3F"],75:["#02529C","#FFFFFF","#DC1E35"],
+  76:["#D52B1E","#FCD116","#007934"],77:["#FFFFFF","#0038B8","#FFFFFF"],79:["#FFFFFF","#DB161B","#008000"],81:["#C40308","#D3AE3B","#C40308"],
+  82:["#002B7F","#F9E814","#002B7F"],83:["#00209F","#FFFFFF","#D21034"],85:["#00247D","#FFFFFF","#CC142B"],86:["#FFFFFF","#00966E","#D62612"]
+};
 const MATCHES=[
   {id:1,group:"A",home:15,away:60,date:"2026-06-11",time:"15:00"},{id:2,group:"A",home:25,away:41,date:"2026-06-11",time:"22:00"},
   {id:3,group:"B",home:30,away:65,date:"2026-06-12",time:"15:00"},{id:4,group:"D",home:16,away:40,date:"2026-06-12",time:"21:00"},
@@ -1806,14 +1835,12 @@ function bracketTeamRow(side, teamId, res, winner) {
 
 
 function teamFlagMarkup(teamId) {
-  const emoji = teamId ? (FLAGS[teamId] || '🏳️') : '🏴';
-  const code = teamId ? (FLAG_CODES[teamId] || '') : '';
-  const shortCode = code ? code.replace('gb-', '').toUpperCase().slice(0, 3) : '';
-  // Use native Unicode flag glyphs instead of external image files.
-  // This avoids CORS problems in PNG export and guarantees flags remain visible.
-  return `<span class="bracket-team-flag" title="${teamId ? (TEAMS[teamId] || 'Country') : 'TBD'} flag">
-    <span class="bracket-team-emoji" aria-hidden="true">${emoji}</span>
-    ${shortCode ? `<span class="bracket-team-flag-code">${shortCode}</span>` : ''}
+  const codeRaw = teamId ? (FLAG_CODES[teamId] || '') : '';
+  const shortCode = codeRaw ? codeRaw.replace('gb-', '').toUpperCase().slice(0, 3) : 'TBD';
+  const colors = teamId && FLAG_COLORS[teamId] ? FLAG_COLORS[teamId] : ['#667085','#D0D5DD','#344054'];
+  const title = teamId ? (TEAMS[teamId] || 'Country') : 'TBD';
+  return `<span class="bracket-team-flag visual-flag" title="${title} flag" style="--flag-a:${colors[0]};--flag-b:${colors[1]};--flag-c:${colors[2]};">
+    <span class="bracket-team-flag-code">${shortCode}</span>
   </span>`;
 }
 
@@ -1890,8 +1917,9 @@ function cssVar(name, fallback) {
 }
 
 function exportTeamLineSvg(teamId, score, pen, isWinner, x, y, w, colors) {
-  const flag = teamId ? (FLAGS[teamId] || '🏳️') : '🏴';
-  const code = teamId ? ((FLAG_CODES[teamId] || '').replace('gb-', '').toUpperCase().slice(0,3)) : '';
+  const codeRaw = teamId ? (FLAG_CODES[teamId] || '') : '';
+  const code = codeRaw ? codeRaw.replace('gb-', '').toUpperCase().slice(0,3) : 'TBD';
+  const fc = teamId && FLAG_COLORS[teamId] ? FLAG_COLORS[teamId] : ['#667085','#D0D5DD','#344054'];
   const name = teamId ? (TEAMS[teamId] || 'TBD') : 'TBD';
   const rowFill = isWinner ? colors.winFill : colors.rowFill;
   const rowStroke = isWinner ? colors.winStroke : colors.line;
@@ -1900,9 +1928,15 @@ function exportTeamLineSvg(teamId, score, pen, isWinner, x, y, w, colors) {
   const penSvg = pen != null && pen !== '' ? `<text x="${x+w-43}" y="${y+21}" fill="${colors.pen}" font-size="9" font-weight="800">P${xmlEscape(pen)}</text>` : '';
   return `
     <rect x="${x}" y="${y}" width="${w}" height="30" rx="8" fill="${rowFill}" stroke="${rowStroke}" stroke-width="1"/>
-    <rect x="${x+7}" y="${y+5}" width="32" height="20" rx="5" fill="${colors.surface2}" stroke="${colors.line}" stroke-width="1"/>
-    <text x="${x+23}" y="${y+21}" text-anchor="middle" font-size="16">${xmlEscape(flag)}</text>
-    ${code ? `<text x="${x+37}" y="${y+27}" fill="${colors.muted}" font-size="6" font-weight="800">${xmlEscape(code)}</text>` : ''}
+    <clipPath id="flagClip${x}${y}"><rect x="${x+7}" y="${y+5}" width="32" height="20" rx="5"/></clipPath>
+    <g clip-path="url(#flagClip${x}${y})">
+      <rect x="${x+7}" y="${y+5}" width="10.7" height="20" fill="${fc[0]}"/>
+      <rect x="${x+17.7}" y="${y+5}" width="10.7" height="20" fill="${fc[1]}"/>
+      <rect x="${x+28.4}" y="${y+5}" width="10.6" height="20" fill="${fc[2]}"/>
+      <rect x="${x+7}" y="${y+5}" width="32" height="20" fill="none" stroke="${colors.line}" stroke-width="1"/>
+    </g>
+    <rect x="${x+12}" y="${y+11}" width="22" height="11" rx="4" fill="rgba(0,0,0,.42)"/>
+    <text x="${x+23}" y="${y+20}" text-anchor="middle" fill="#ffffff" font-size="7" font-weight="900">${xmlEscape(code)}</text>
     <text x="${x+47}" y="${y+20}" fill="${colors.text}" font-size="12" font-weight="${isWinner ? '800':'650'}">${safeName}</text>
     <rect x="${x+w-30}" y="${y+5}" width="24" height="20" rx="6" fill="${colors.surface2}" stroke="${colors.line}" stroke-width="1"/>
     <text x="${x+w-18}" y="${y+21}" text-anchor="middle" fill="${colors.text}" font-size="16" font-weight="800">${safeScore}</text>
