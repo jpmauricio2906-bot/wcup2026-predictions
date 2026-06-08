@@ -206,6 +206,33 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 .spinner{width:32px;height:32px;border:3px solid var(--card-border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+
+
+/* BRACKET VIEW */
+.bracket-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:20px 0 16px;}
+.bracket-title{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px;}
+.bracket-sub{font-size:13px;color:var(--text-muted);margin-top:2px;}
+.bracket-toggle{display:flex;gap:0;border:1px solid var(--card-border);border-radius:10px;overflow:hidden;}
+.bracket-toggle-btn{padding:10px 16px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;}
+.bracket-toggle-btn.active{background:var(--accent);color:#0a0e1a;}
+.bracket-note{font-size:12px;color:var(--text-subtle);margin-bottom:16px;padding:10px 14px;background:var(--input-bg);border-radius:8px;border-left:3px solid var(--accent);}
+.bracket-scroll{overflow-x:auto;padding-bottom:8px;}
+.bracket-board{display:grid;grid-template-columns:repeat(7,minmax(190px,1fr));gap:12px;min-width:1360px;align-items:start;}
+.bracket-round{display:flex;flex-direction:column;gap:10px;}
+.bracket-round-title{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--accent);letter-spacing:1px;text-align:center;border-bottom:1px solid var(--card-border);padding-bottom:6px;margin-bottom:2px;}
+.bracket-match{background:var(--card-bg);border:1px solid var(--card-border);border-radius:10px;padding:10px;min-height:92px;position:relative;}
+.bracket-match.has-result{border-left:3px solid var(--correct-border);}
+.bracket-match.waiting{opacity:.78;}
+.bracket-match-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;}
+.bracket-match-id{color:var(--accent);font-weight:700;}
+.bracket-team-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;font-size:12px;}
+.bracket-team-row.winner{background:var(--correct-bg);color:var(--correct-border);font-weight:700;}
+.bracket-team-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bracket-score{font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--page-text);min-width:22px;text-align:right;}
+.bracket-pen{font-size:10px;color:#4f8ef7;margin-left:4px;}
+.bracket-wait{font-size:10px;color:var(--text-subtle);font-style:italic;margin-top:6px;}
+@media(max-width:600px){.bracket-board{min-width:1220px;grid-template-columns:repeat(7,170px)}.bracket-title{font-size:26px}.bracket-toggle-btn{padding:8px 12px;font-size:12px}}
+
 /* LOCKED STATE */
 .locked-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
 .locked-icon{font-size:52px;margin-bottom:16px;}
@@ -284,6 +311,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
   <div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" onclick="showSection('predictions',this)">⚽ Predictions</button>
     <button class="nav-tab" onclick="showSection('groups',this)">🌍 Groups</button>
+    <button class="nav-tab" onclick="showSection('bracket',this)">🧬 Bracket</button>
     <button class="nav-tab" onclick="showSection('leaderboard',this)">🏆 Leaderboard</button>
     <button class="nav-tab" onclick="showSection('stats',this)">📊 Stats</button>
   </div>
@@ -326,6 +354,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
   <div class="section active" id="section-predictions">
     <div class="phase-filter" id="phaseFilter"></div>
     <div id="matchesContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
+  </div>
+  <div class="section" id="section-bracket">
+    <div id="bracketContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
   </div>
   <div class="section" id="section-leaderboard">
     <div id="leaderboardContainer"><div class="loading"><div class="spinner"></div>Loading…</div></div>
@@ -725,7 +756,7 @@ function getPhaseKeyFromStageLabel(label) {
     'Round of 16': 'r16',
     'Quarter-Finals': 'qf',
     'Semi-Finals': 'sf',
-    'Third Place': 'final',
+    'Third Place': 'tp',
     'Final': 'final'
   })[label] || 'group';
 }
@@ -962,6 +993,7 @@ function showSection(name, btn) {
   if(name==='leaderboard') renderLeaderboard();
   if(name==='stats') renderStats();
   if(name==='groups') renderGroups('real');
+  if(name==='bracket') renderBracket(_bracketView);
 }
 
 // ===== SCORING =====
@@ -1049,7 +1081,7 @@ function renderMatches() {
   }
 
   // Sort groups alphabetically, keep knockout phases in order
-  const phaseKeyMap = {'Group Stage':'group','Round of 32':'r32','Round of 16':'r16','Quarter-Finals':'qf','Semi-Finals':'sf','Third Place':'final','Final':'final'};
+  const phaseKeyMap = {'Group Stage':'group','Round of 32':'r32','Round of 16':'r16','Quarter-Finals':'qf','Semi-Finals':'sf','Third Place':'tp','Final':'final'};
   const knockoutOrder = ['Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
   const sortedEntries = Object.entries(grouped).sort(([a],[b]) => {
     const aIsGroup = a.startsWith('Group ');
@@ -1362,6 +1394,121 @@ async function renderLeaderboard() {
       }).join('')}
     </div>
     ${scoreboard.length===0?'<div class="loading">No players yet</div>':''}`;
+}
+
+
+// ===== BRACKET TAB =====
+let _bracketView = 'predicted';
+
+function renderBracket(view='predicted') {
+  _bracketView = view;
+  const container = document.getElementById('bracketContainer');
+  if (!container) return;
+  refreshBracket();
+
+  const isPred = view === 'predicted';
+  const source = isPred ? myPredictions : matchResults;
+  const bracket = isPred ? _predictedBracket : _computedBracket;
+
+  if (isPred && !currentProfile) {
+    container.innerHTML = `<div class="locked-state">
+      <div class="locked-icon">🔒</div>
+      <div class="locked-title">Sign in to see your predicted bracket</div>
+      <div class="locked-sub">The official bracket can still be viewed without signing in.</div>
+      <button class="btn btn-primary" onclick="openAuth('login')" style="margin-right:8px">Sign In</button>
+      <button class="btn btn-secondary" onclick="renderBracket('official')">View Official Bracket</button>
+    </div>`;
+    return;
+  }
+
+  const rounds = [
+    { label:'Round of 32',    ids: getPhaseIds('r32') },
+    { label:'Round of 16',    ids: getPhaseIds('r16') },
+    { label:'Quarter-Finals', ids: getPhaseIds('qf') },
+    { label:'Semi-Finals',    ids: getPhaseIds('sf') },
+    { label:'Third Place',    ids: getPhaseIds('tp') },
+    { label:'Final',          ids: getPhaseIds('final') }
+  ];
+
+  const note = isPred
+    ? '🔮 <strong>Predicted Bracket</strong> — uses your predictions and penalty winners to project who advances. A tied knockout match without penalties leaves the next slot as TBD.'
+    : '📊 <strong>Official Bracket</strong> — uses admin-entered official results. It will fill progressively as real matches are played.';
+
+  container.innerHTML = `
+    <div class="bracket-toolbar">
+      <div>
+        <div class="bracket-title">🧬 Tournament Bracket</div>
+        <div class="bracket-sub">Database-driven structure from the Excel workbook</div>
+      </div>
+      <div class="bracket-toggle">
+        <button class="bracket-toggle-btn${isPred?' active':''}" onclick="renderBracket('predicted')">🔮 Predicted</button>
+        <button class="bracket-toggle-btn${!isPred?' active':''}" onclick="renderBracket('official')">📊 Official</button>
+      </div>
+    </div>
+    <div class="bracket-note">${note}</div>
+    <div class="bracket-scroll">
+      <div class="bracket-board">
+        ${rounds.map(r => `<div class="bracket-round">
+          <div class="bracket-round-title">${r.label}</div>
+          ${r.ids.map(id => bracketMatchCard(id, source, bracket, isPred)).join('')}
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function getPhaseIds(key) {
+  const ph = PHASES.find(p=>p.key===key);
+  return ph ? [...ph.matchIds].sort((a,b)=>a-b) : [];
+}
+
+function bracketMatchCard(matchId, source, bracket, isPredictedView) {
+  const m = MATCHES.find(x=>x.id===matchId) || {id:matchId, label:''};
+  const b = bracket[matchId] || {};
+  const res = source[matchId];
+  const hasRes = !!res;
+  const winner = hasRes && b.home && b.away ? getMatchWinner(res, true) : null;
+  const waiting = !b.home || !b.away || (hasRes && res.home === res.away && winner === null);
+  const label = m.label || `${matchId}`;
+  const date = m.date ? new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+
+  return `<div class="bracket-match${hasRes?' has-result':''}${waiting?' waiting':''}">
+    <div class="bracket-match-meta">
+      <span class="bracket-match-id">M${matchId}</span>
+      <span>${date}</span>
+    </div>
+    <div style="font-size:10px;color:var(--text-subtle);font-style:italic;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+    ${bracketTeamRow('home', b.home, res, winner)}
+    ${bracketTeamRow('away', b.away, res, winner)}
+    ${bracketWaitingText(matchId, res, b, isPredictedView)}
+  </div>`;
+}
+
+function bracketTeamRow(side, teamId, res, winner) {
+  const isWinner = winner === side;
+  const score = res ? (side === 'home' ? res.home : res.away) : '–';
+  const pen = res && res.home === res.away
+    ? (side === 'home' ? res.home_pen : res.away_pen)
+    : null;
+  const penHtml = pen != null ? `<span class="bracket-pen">p.${pen}</span>` : '';
+  return `<div class="bracket-team-row${isWinner?' winner':''}">
+    <span class="bracket-team-name">${teamLabel(teamId)}</span>
+    <span class="bracket-score">${score}${penHtml}</span>
+  </div>`;
+}
+
+function bracketWaitingText(matchId, res, bracket, isPredictedView) {
+  if (!bracket.home || !bracket.away) return `<div class="bracket-wait">Waiting for feeder result(s)</div>`;
+  if (res && res.home === res.away && getMatchWinner(res, true) === null) {
+    return `<div class="bracket-wait">Tied match needs a penalty winner</div>`;
+  }
+  if (!res && !isPredictedView) return `<div class="bracket-wait">Official result not entered yet</div>`;
+  if (!res && isPredictedView) return `<div class="bracket-wait">Prediction not entered yet</div>`;
+  return '';
+}
+
+function teamLabel(teamId) {
+  if (!teamId) return '🏴 TBD';
+  return `${FLAGS[teamId] || '🏳️'} ${TEAMS[teamId] || 'TBD'}`;
 }
 
 // ===== STATS =====
@@ -2414,12 +2561,13 @@ function refreshBracket() {
 // PHASE SYSTEM
 // ═══════════════════════════════════════════════════
 const PHASES = [
-  { key:'group', label:'Group Stage',    matchIds: Array.from({length:72},(_,i)=>i+1) },
-  { key:'r32',   label:'Round of 32',    matchIds: Array.from({length:16},(_,i)=>i+73) },
-  { key:'r16',   label:'Round of 16',    matchIds: Array.from({length:8}, (_,i)=>i+89) },
-  { key:'qf',    label:'Quarter-Finals', matchIds: Array.from({length:4}, (_,i)=>i+97) },
-  { key:'sf',    label:'Semi-Finals',    matchIds: [101,102] },
-  { key:'final', label:'Final',          matchIds: [103,104] },
+  { key:'group', label:'Group Stage',    matchIds: Array.from({length:72},(_,i)=>i+1),  unlockAfter:null },
+  { key:'r32',   label:'Round of 32',    matchIds: Array.from({length:16},(_,i)=>i+73), unlockAfter:'group' },
+  { key:'r16',   label:'Round of 16',    matchIds: Array.from({length:8}, (_,i)=>i+89), unlockAfter:'r32' },
+  { key:'qf',    label:'Quarter-Finals', matchIds: Array.from({length:4}, (_,i)=>i+97), unlockAfter:'r16' },
+  { key:'sf',    label:'Semi-Finals',    matchIds: [101,102],                         unlockAfter:'qf' },
+  { key:'tp',    label:'Third Place',    matchIds: [103],                             unlockAfter:'sf' },
+  { key:'final', label:'Final',          matchIds: [104],                             unlockAfter:'sf' },
 ];
 const PHASE_ORDER = PHASES.map(p=>p.key);
 
@@ -2539,24 +2687,32 @@ function getPhaseKey(matchId) {
 // Is a phase editable for the current player?
 // - Must not be confirmed yet
 // - Previous phase must be confirmed (except group stage)
+function getUnlockDependency(phaseKey) {
+  const phase = PHASES.find(p=>p.key===phaseKey);
+  if (!phase) return null;
+  if (phase.unlockAfter !== undefined) return phase.unlockAfter;
+  const idx = PHASE_ORDER.indexOf(phaseKey);
+  return idx > 0 ? PHASE_ORDER[idx-1] : null;
+}
+
 function isPhaseEditable(phaseKey) {
   if (playerConfirmations.has(phaseKey)) return false; // already confirmed = locked
-  const idx = PHASE_ORDER.indexOf(phaseKey);
-  if (idx === 0) return true; // group stage always editable if not confirmed
-  const prevKey = PHASE_ORDER[idx-1];
-  return playerConfirmations.has(prevKey); // previous phase must be confirmed
+  const depKey = getUnlockDependency(phaseKey);
+  if (!depKey) return true; // group stage always editable if not confirmed
+  return playerConfirmations.has(depKey);
 }
 
 // Is a phase visible (teams shown in preview)?
 // Next phase is ALWAYS visible as soon as previous phase has any predictions.
 // This lets players see projected matchups and think ahead while filling in.
 function isPhaseVisible(phaseKey) {
-  const idx = PHASE_ORDER.indexOf(phaseKey);
-  if (idx === 0) return true;
-  // Show teams if previous phase has at least 1 prediction filled
-  const prevPhase = PHASES[idx-1];
-  if (!prevPhase) return false;
-  return prevPhase.matchIds.some(id => myPredictions[id] !== undefined);
+  const depKey = getUnlockDependency(phaseKey);
+  if (!depKey) return true;
+  // Show teams if the unlocking phase has at least 1 prediction filled.
+  // Third Place and Final both depend directly on the Semi-Finals.
+  const depPhase = PHASES.find(p=>p.key===depKey);
+  if (!depPhase) return false;
+  return depPhase.matchIds.some(id => myPredictions[id] !== undefined);
 }
 
 // Count predictions filled for a phase
@@ -2583,7 +2739,8 @@ function renderPhaseBanner(phaseKey) {
     </div>`;
   }
   if (!visible) {
-    const prevLabel = PHASES[PHASE_ORDER.indexOf(phaseKey)-1]?.label || 'previous phase';
+    const depKey = getUnlockDependency(phaseKey);
+    const prevLabel = PHASES.find(p=>p.key===depKey)?.label || 'previous phase';
     return `<div class="phase-banner phase-banner-locked" id="banner-${phaseKey}">
       🔒 Confirm <strong>${prevLabel}</strong> to unlock this phase
     </div>`;
