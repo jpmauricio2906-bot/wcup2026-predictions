@@ -226,28 +226,33 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
 
 /* DUAL ROW MATCH CARDS */
 .match-row{display:flex;align-items:center;gap:8px;padding:8px 14px;}
-.match-row-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;min-width:72px;flex-shrink:0;}
+.match-row-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;min-width:76px;flex-shrink:0;}
 .row-prediction .match-row-label{color:var(--accent);}
 .row-official .match-row-label{color:var(--correct-border);}
 .row-official{background:rgba(46,204,113,0.04);border-top:1px solid var(--card-border);}
-.row-tbd .match-row-label{color:var(--text-subtle);}
 .row-tbd{background:transparent;border-top:1px solid var(--card-border);}
-.match-row .team-side{flex:1;}
-.match-row .score-area{flex-shrink:0;}
+.row-tbd .match-row-label{color:var(--text-subtle);}
 .score-static{width:44px;height:36px;background:var(--input-bg);border:1px solid var(--card-border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--text-muted);}
 .score-official{border-color:var(--correct-border);color:var(--correct-border);background:var(--correct-bg);}
 .match-card-v2{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--br);overflow:hidden;transition:box-shadow .2s;position:relative;}
 .match-card-v2:hover{box-shadow:var(--shadow);}
 .match-card-v2.has-prediction{border-left:3px solid var(--accent);}
 .match-card-v2.has-result{border-left:3px solid var(--correct-border);}
+.match-card-v2.phase-confirmed{opacity:.85;}
 .match-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 0;}
 .pts-badge-v2{font-family:'Bebas Neue',sans-serif;font-size:13px;padding:2px 8px;border-radius:6px;}
-.pending-label{font-size:10px;color:var(--text-subtle);font-style:italic;}
-/* Keep old score-input styles for prediction row */
 .score-input-pred{width:44px;height:36px;background:var(--input-bg);border:1px solid var(--input-border);color:var(--page-text);border-radius:8px;text-align:center;font-size:18px;font-weight:700;font-family:'Bebas Neue',sans-serif;outline:none;transition:all .2s;-moz-appearance:textfield;}
 .score-input-pred::-webkit-inner-spin-button,.score-input-pred::-webkit-outer-spin-button{-webkit-appearance:none;}
 .score-input-pred:focus{border-color:var(--accent);background:var(--accent-bg);}
 .score-input-pred:disabled{opacity:.5;cursor:not-allowed;}
+/* Phase banners */
+.phase-banner{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;font-weight:500;}
+.phase-banner-open{background:var(--accent-bg);border:1px solid var(--accent);color:var(--accent);}
+.phase-banner-ready{background:var(--correct-bg);border:1px solid var(--correct-border);color:var(--correct-border);}
+.phase-banner-locked{background:var(--input-bg);border:1px solid var(--card-border);color:var(--text-muted);}
+/* Admin unlock buttons */
+.unlock-btn{padding:3px 10px;font-size:11px;border-radius:6px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;}
+.unlock-btn:hover{background:var(--accent-bg);}
 @media(max-width:600px){
   .match-row-label{min-width:56px;font-size:9px;}
   .score-input-pred,.score-static{width:36px;height:32px;font-size:15px;}
@@ -602,6 +607,7 @@ async function doChangePassword() {
 
 async function doSignOut() {
   await sb.auth.signOut();
+  playerConfirmations = new Set();
   showToast('Signed out', '');
 }
 
@@ -732,92 +738,99 @@ function renderMatches() {
     </div>`;
   }
 
-  html+=Object.entries(grouped).map(([phase,matches])=>
-    `<div class="phase-section">
-      <div class="phase-title">${phase}</div>
-      <div class="match-grid">${matches.map(m=>matchCard(m)).join('')}</div>
-    </div>`
-  ).join('');
+  // Map display phase name -> phase key
+  const phaseKeyMap = {'Group Stage':'group','Round of 32':'r32','Round of 16':'r16','Quarter-Finals':'qf','Semi-Finals':'sf','Third Place':'final','Final':'final'};
+  html+=Object.entries(grouped).map(([phase,matches])=>{
+    const pk = phaseKeyMap[phase] || 'group';
+    return renderPhaseSection(phase, matches, pk);
+  }).join('');
 
   container.innerHTML=html;
 }
 
+
 function matchCard(m) {
+  const phaseKey = getPhaseKey(m.id);
+  const confirmed = playerConfirmations.has(phaseKey);
+  const editable  = isPhaseEditable(phaseKey);
+  const visible   = isPhaseVisible(phaseKey);
+
   const pred    = myPredictions[m.id];
   const result  = matchResults[m.id];
   const hasPred  = pred !== undefined;
   const hasResult = result !== undefined;
   const pts = hasPred && hasResult ? calcPts(pred, result) : null;
 
-  // Points badge
   const ptsHtml = pts !== null
-    ? `<span class="pts-badge-v2 pts-${pts}">${pts} PT${pts!==1?'S':'S'}</span>`
-    : '';
+    ? `<span class="pts-badge-v2 pts-${pts}">${pts} PT${pts!==1?'S':'S'}</span>` : '';
 
-  // Card border class
   let cls = 'match-card-v2';
-  if (hasPred)   cls += ' has-prediction';
-  if (hasResult) cls += ' has-result';
+  if (hasPred)    cls += ' has-prediction';
+  if (hasResult)  cls += ' has-result';
+  if (confirmed)  cls += ' phase-confirmed';
 
   const dateStr = new Date(m.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short'});
 
-  // ── TEAMS ──
-  // For group matches: fixed teams. For knockout: from brackets.
-  let hTeam, aTeam, hPredTeam, aPredTeam;
-  let isKnockout = !m.group;
-
+  // ── TEAMS for each row ──
+  let hPredTeam, aPredTeam, hOffTeam, aOffTeam;
   if (m.group) {
-    hTeam = aPredTeam = m.home;   // same teams for both rows in group stage
-    aTeam = hPredTeam = m.away;
-    hTeam = m.home; aTeam = m.away;
-    hPredTeam = m.home; aPredTeam = m.away;
+    hPredTeam = hOffTeam = m.home;
+    aPredTeam = aOffTeam = m.away;
   } else {
-    // Official bracket (real results)
-    const bktReal = _computedBracket[m.id] || {};
-    hTeam  = bktReal.home  || null;
-    aTeam  = bktReal.away  || null;
-    // Predicted bracket (player's predictions)
-    const bktPred = _predictedBracket[m.id] || {};
-    hPredTeam = bktPred.home || null;
-    aPredTeam = bktPred.away || null;
+    const bPred = visible ? (_predictedBracket[m.id]||{}) : {};
+    const bOff  = _computedBracket[m.id] || {};
+    hPredTeam = bPred.home || null;
+    aPredTeam = bPred.away || null;
+    hOffTeam  = bOff.home  || null;
+    aOffTeam  = bOff.away  || null;
   }
 
-  const tName = t => t ? (TEAMS[t]||'?') : 'TBD';
-  const tFlag = t => t ? (FLAGS[t]||'🏳️') : '🏴';
+  const tN = t => t ? (TEAMS[t]||'?') : 'TBD';
+  const tF = t => t ? (FLAGS[t]||'🏳️') : '🏴';
 
   // ── PREDICTION ROW ──
-  const predDisabled = isKnockout
-    ? (!hPredTeam || !aPredTeam || hasResult ? 'disabled' : '')
-    : (hasResult ? 'disabled' : '');
+  const inputDisabled = !editable || hasResult
+    || (m.group ? false : (!hPredTeam || !aPredTeam));
   const hv = hasPred ? pred.home : '';
   const av = hasPred ? pred.away : '';
 
+  let predRowContent;
+  if (!visible && !m.group) {
+    // Phase not yet unlocked — show locked message
+    predRowContent = `<div style="flex:1;font-size:12px;color:var(--text-subtle);font-style:italic">
+      🔒 Complete & confirm previous phase to unlock
+    </div>`;
+  } else {
+    predRowContent = `
+      <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
+        <span class="team-flag">${tF(hPredTeam)}</span>
+        <span class="team-name">${tN(hPredTeam)}</span>
+      </div>
+      <div class="score-area" style="display:flex;align-items:center;gap:4px">
+        <input type="number" class="score-input-pred" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–"
+          oninput="onScore(${m.id})" ${inputDisabled?'disabled':''}>
+        <span class="score-sep">:</span>
+        <input type="number" class="score-input-pred" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–"
+          oninput="onScore(${m.id})" ${inputDisabled?'disabled':''}>
+      </div>
+      <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
+        <span class="team-name" style="text-align:right">${tN(aPredTeam)}</span>
+        <span class="team-flag">${tF(aPredTeam)}</span>
+      </div>`;
+  }
+
   const predRow = `<div class="match-row row-prediction">
-    <span class="match-row-label">🔮 My Prediction</span>
-    <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
-      <span class="team-flag">${tFlag(hPredTeam)}</span>
-      <span class="team-name">${tName(hPredTeam)}</span>
-    </div>
-    <div class="score-area" style="display:flex;align-items:center;gap:4px">
-      <input type="number" class="score-input-pred" min="0" max="99" value="${hv}" id="h-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${predDisabled}>
-      <span class="score-sep">:</span>
-      <input type="number" class="score-input-pred" min="0" max="99" value="${av}" id="a-${m.id}" placeholder="–" oninput="onScore(${m.id})" ${predDisabled}>
-    </div>
-    <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
-      <span class="team-name" style="text-align:right">${tName(aPredTeam)}</span>
-      <span class="team-flag">${tFlag(aPredTeam)}</span>
-    </div>
+    <span class="match-row-label">${confirmed?'🔒':'🔮'} ${confirmed?'PREDICTED':'MY PRED.'}</span>
+    ${predRowContent}
   </div>`;
 
   // ── OFFICIAL ROW ──
   let officialRow;
   if (hasResult) {
-    // Show actual result with official teams
     officialRow = `<div class="match-row row-official">
-      <span class="match-row-label">📊 Official</span>
+      <span class="match-row-label">📊 OFFICIAL</span>
       <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
-        <span class="team-flag">${tFlag(hTeam)}</span>
-        <span class="team-name">${tName(hTeam)}</span>
+        <span class="team-flag">${tF(hOffTeam)}</span><span class="team-name">${tN(hOffTeam)}</span>
       </div>
       <div class="score-area" style="display:flex;align-items:center;gap:4px">
         <div class="score-static score-official">${result.home}</div>
@@ -825,52 +838,41 @@ function matchCard(m) {
         <div class="score-static score-official">${result.away}</div>
       </div>
       <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
-        <span class="team-name" style="text-align:right">${tName(aTeam)}</span>
-        <span class="team-flag">${tFlag(aTeam)}</span>
+        <span class="team-name" style="text-align:right">${tN(aOffTeam)}</span>
+        <span class="team-flag">${tF(aOffTeam)}</span>
       </div>
     </div>`;
-  } else if (hTeam && aTeam) {
-    // Teams are known but match not played yet
+  } else if (hOffTeam && aOffTeam) {
     officialRow = `<div class="match-row row-tbd">
-      <span class="match-row-label" style="color:var(--text-muted)">📋 Scheduled</span>
+      <span class="match-row-label">📋 SCHEDULED</span>
       <div class="team-side" style="flex:1;display:flex;align-items:center;gap:6px">
-        <span class="team-flag">${tFlag(hTeam)}</span>
-        <span class="team-name">${tName(hTeam)}</span>
+        <span class="team-flag">${tF(hOffTeam)}</span><span class="team-name">${tN(hOffTeam)}</span>
       </div>
       <div class="score-area" style="display:flex;align-items:center;gap:4px">
-        <div class="score-static">–</div>
-        <span class="score-sep">:</span>
-        <div class="score-static">–</div>
+        <div class="score-static">–</div><span class="score-sep">:</span><div class="score-static">–</div>
       </div>
       <div class="team-side away" style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:6px">
-        <span class="team-name" style="text-align:right">${tName(aTeam)}</span>
-        <span class="team-flag">${tFlag(aTeam)}</span>
+        <span class="team-name" style="text-align:right">${tN(aOffTeam)}</span>
+        <span class="team-flag">${tF(aOffTeam)}</span>
       </div>
     </div>`;
   } else {
-    // Teams not yet known (knockout, waiting for earlier rounds)
     officialRow = `<div class="match-row row-tbd">
-      <span class="match-row-label" style="color:var(--text-subtle)">📋 Scheduled</span>
+      <span class="match-row-label">📋 SCHEDULED</span>
       <div style="flex:1;font-size:12px;color:var(--text-subtle);font-style:italic">Teams to be determined</div>
     </div>`;
   }
 
-  // ── SAVE INDICATOR ──
-  const saveInd = hasPred
-    ? `<span class="save-ind" style="position:static;margin-left:auto"><span class="dot-saved"></span>Saved</span>`
-    : '';
-
-  // ── LABEL for knockout ──
-  const matchLabel = isKnockout && m.label
-    ? `<div class="match-label" style="padding:4px 14px 0;font-size:11px;color:var(--text-subtle);font-style:italic">${m.label}</div>`
-    : '';
+  const saveInd = hasPred && !confirmed
+    ? `<span class="save-ind" style="position:static;margin-left:4px"><span class="dot-saved"></span>Saved</span>` : '';
+  const matchLabel = !m.group && m.label
+    ? `<div style="padding:4px 14px 0;font-size:11px;color:var(--text-subtle);font-style:italic">${m.label}</div>` : '';
 
   return `<div class="${cls}" id="mc-${m.id}">
     <div class="match-header">
       <span class="match-date" style="font-size:11px;color:var(--text-muted)">📅 ${dateStr}${m.time?' · '+m.time:''}</span>
       <div style="display:flex;align-items:center;gap:8px">
-        ${saveInd}
-        ${ptsHtml}
+        ${saveInd}${ptsHtml}
         <span class="group-badge">${m.group?'Group '+m.group:m.phase}</span>
       </div>
     </div>
@@ -904,6 +906,8 @@ function onScore(matchId) {
     const cnt=Object.keys(myPredictions).length;
     document.getElementById('authPredCount').textContent=`${cnt} predictions saved`;
     try{_predictedBracket=computeBracket(myPredictions);}catch(e){}
+    // Re-render to update confirm button
+    renderMatches();
   },600);
 }
 
@@ -1012,12 +1016,16 @@ async function renderAdmin() {
       <div class="admin-title">Players (${(players||[]).filter(p=>!p.is_admin).length})</div>
       <div class="players-mgmt">
         <div class="pmgmt-row header"><div>Name</div><div>Email visible</div></div>
-        ${(players||[]).map(p=>`<div class="pmgmt-row">
+        ${(players||[]).map(p=>`<div class="pmgmt-row" style="grid-template-columns:1fr auto">
           <div style="font-weight:600">${p.is_admin?'⚙️ ':''} ${p.display_name}</div>
-          <div style="font-size:12px;color:var(--text-muted)">${p.is_admin?'Admin':'Player'}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+            ${p.is_admin?'<span style="font-size:12px;color:var(--text-muted)">Admin</span>':
+              PHASES.map(ph=>`<button class="unlock-btn" onclick="adminUnlockPhase('${p.id}','${p.display_name}','${ph.key}')"
+                title="Unlock ${ph.label} for ${p.display_name}">🔓 ${ph.label}</button>`).join('')}
+          </div>
         </div>`).join('')}
       </div>
-      <div style="font-size:12px;color:var(--text-subtle);margin-top:8px">Manage full user accounts in your Supabase Dashboard → Authentication → Users</div>
+      <div style="font-size:12px;color:var(--text-subtle);margin-top:8px">Use the unlock buttons to re-open a confirmed phase for a player.</div>
     </div>
     ${phases.map(phase=>{
       const matches=phaseMap[phase]||[];
@@ -1845,7 +1853,7 @@ function computeBracket(results) {
   const qfComplete    = qfResultCount >= 4;
   const sfComplete    = sfResultCount >= 2;
 
-  // Allow partial results — only gate later rounds
+  // No gate — partial results compute partial bracket
 
   // Step 1: compute all group standings
   const groupStandings = {};
@@ -1885,9 +1893,9 @@ function computeBracket(results) {
 
   // Helper: get teamId of 3rd place from a group letter slot
   const get3rd = (grpLetter) => grpLetter ? (thirdByGroup[grpLetter] || null) : null;
-  const grpHasRes = (grp) => Object.keys(results).some(id => GROUP_MATCHES[grp]?.includes(parseInt(id)));
-  const get1st = (grp) => grpHasRes(grp) ? (groupStandings[grp]?.[0]?.teamId || null) : null;
-  const get2nd = (grp) => grpHasRes(grp) ? (groupStandings[grp]?.[1]?.teamId || null) : null;
+  const grpHasRes = g => Object.keys(results).some(id=>GROUP_MATCHES[g]?.includes(parseInt(id)));
+  const get1st = g => grpHasRes(g) ? (groupStandings[g]?.[0]?.teamId||null) : null;
+  const get2nd = g => grpHasRes(g) ? (groupStandings[g]?.[1]?.teamId||null) : null;
 
   // Step 4: populate Round of 32 (matches 73-88)
   // Fixed matchups (no 3rd place)
@@ -1967,8 +1975,167 @@ let _computedBracket = {};
 let _predictedBracket = {};
 
 function refreshBracket() {
-  try { _computedBracket  = computeBracket(matchResults);  } catch(e) { _computedBracket={}; }
-  try { _predictedBracket = computeBracket(myPredictions); } catch(e) { _predictedBracket={}; }
+  try { _computedBracket  = computeBracket(matchResults);  } catch(e){ _computedBracket={}; }
+  try { _predictedBracket = computeBracket(myPredictions); } catch(e){ _predictedBracket={}; }
+}
+
+
+// ═══════════════════════════════════════════════════
+// PHASE SYSTEM
+// ═══════════════════════════════════════════════════
+const PHASES = [
+  { key:'group', label:'Group Stage',    matchIds: Array.from({length:72},(_,i)=>i+1) },
+  { key:'r32',   label:'Round of 32',    matchIds: Array.from({length:16},(_,i)=>i+73) },
+  { key:'r16',   label:'Round of 16',    matchIds: Array.from({length:8}, (_,i)=>i+89) },
+  { key:'qf',    label:'Quarter-Finals', matchIds: Array.from({length:4}, (_,i)=>i+97) },
+  { key:'sf',    label:'Semi-Finals',    matchIds: [101,102] },
+  { key:'final', label:'Final',          matchIds: [103,104] },
+];
+const PHASE_ORDER = PHASES.map(p=>p.key);
+
+// playerConfirmations: Set of phase keys the current player has confirmed
+let playerConfirmations = new Set();
+
+// Load confirmations from Supabase
+async function loadConfirmations() {
+  if (!currentUser) { playerConfirmations = new Set(); return; }
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/phase_confirmations?player_id=eq.${currentUser.id}&select=phase`,
+    { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${_currentSession?.access_token||SUPABASE_KEY}` } }
+  );
+  const data = await res.json();
+  playerConfirmations = new Set((data||[]).map(r=>r.phase));
+}
+
+// Confirm a phase
+async function confirmPhase(phaseKey) {
+  if (!currentUser) return;
+  const phase = PHASES.find(p=>p.key===phaseKey);
+  if (!phase) return;
+  // Verify all matches in phase are predicted
+  const missing = phase.matchIds.filter(id => myPredictions[id]===undefined);
+  if (missing.length > 0) {
+    showToast(`Fill all ${missing.length} remaining predictions first`, 'error');
+    return;
+  }
+  if (!confirm(`Confirm your ${phase.label} predictions? They will be locked and cannot be changed.`)) return;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/phase_confirmations`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${_currentSession?.access_token||SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=minimal'
+    },
+    body: JSON.stringify({ player_id: currentUser.id, phase: phaseKey })
+  });
+  if (res.ok || res.status===201 || res.status===204) {
+    playerConfirmations.add(phaseKey);
+    try{_predictedBracket=computeBracket(myPredictions);}catch(e){}
+    showToast(`${phase.label} predictions confirmed! ✓`, 'success');
+    renderMatches();
+  } else {
+    showToast('Error confirming — please try again', 'error');
+  }
+}
+
+// Admin: unlock a phase for a specific player
+async function adminUnlockPhase(playerId, playerName, phaseKey) {
+  const phase = PHASES.find(p=>p.key===phaseKey);
+  if (!confirm(`Unlock ${phase?.label} for ${playerName}? They will be able to edit those predictions again.`)) return;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/phase_confirmations?player_id=eq.${playerId}&phase=eq.${phaseKey}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${_currentSession?.access_token||SUPABASE_KEY}`,
+        'Prefer': 'return=minimal'
+      }
+    }
+  );
+  if (res.ok || res.status===204) {
+    showToast(`${phase?.label} unlocked for ${playerName} ✓`, 'success');
+  } else {
+    showToast('Error unlocking phase', 'error');
+  }
+}
+
+// Get phase key for a match ID
+function getPhaseKey(matchId) {
+  for (const p of PHASES) if (p.matchIds.includes(matchId)) return p.key;
+  return 'group';
+}
+
+// Is a phase editable for the current player?
+// - Must not be confirmed yet
+// - Previous phase must be confirmed (except group stage)
+function isPhaseEditable(phaseKey) {
+  if (playerConfirmations.has(phaseKey)) return false; // already confirmed = locked
+  const idx = PHASE_ORDER.indexOf(phaseKey);
+  if (idx === 0) return true; // group stage always editable if not confirmed
+  const prevKey = PHASE_ORDER[idx-1];
+  return playerConfirmations.has(prevKey); // previous phase must be confirmed
+}
+
+// Is a phase visible (can see teams) for predictions?
+// A phase is visible if the previous phase is confirmed
+function isPhaseVisible(phaseKey) {
+  const idx = PHASE_ORDER.indexOf(phaseKey);
+  if (idx === 0) return true;
+  return playerConfirmations.has(PHASE_ORDER[idx-1]);
+}
+
+// Count predictions filled for a phase
+function phaseFillCount(phaseKey) {
+  const phase = PHASES.find(p=>p.key===phaseKey);
+  if (!phase) return {filled:0, total:0};
+  const filled = phase.matchIds.filter(id=>myPredictions[id]!==undefined).length;
+  return { filled, total: phase.matchIds.length };
+}
+
+function renderPhaseSection(phaseLabel, matches, phaseKey) {
+  const confirmed   = playerConfirmations.has(phaseKey);
+  const editable    = isPhaseEditable(phaseKey);
+  const visible     = isPhaseVisible(phaseKey);
+  const {filled, total} = phaseFillCount(phaseKey);
+  const allFilled   = filled === total;
+
+  let banner = '';
+  if (!currentProfile) {
+    // not logged in — no banner
+  } else if (confirmed) {
+    banner = `<div class="phase-banner phase-banner-locked">
+      🔒 ${phaseLabel} predictions confirmed &nbsp;·&nbsp; ${filled}/${total} filled
+    </div>`;
+  } else if (!visible) {
+    banner = `<div class="phase-banner phase-banner-locked">
+      🔒 Complete &amp; confirm ${PHASES[PHASE_ORDER.indexOf(phaseKey)-1]?.label||'previous phase'} to unlock this phase
+    </div>`;
+  } else if (editable) {
+    if (allFilled) {
+      banner = `<div class="phase-banner phase-banner-ready">
+        ✅ All ${total} predictions filled!
+        <button class="btn btn-primary" style="padding:6px 16px;font-size:12px;margin-left:12px"
+          onclick="confirmPhase('${phaseKey}')">Confirm & Lock ${phaseLabel} →</button>
+      </div>`;
+    } else {
+      const pct = Math.round((filled/total)*100);
+      banner = `<div class="phase-banner phase-banner-open">
+        <span>🔮 ${phaseLabel} — ${filled}/${total} filled</span>
+        <div style="flex:1;margin:0 12px;height:4px;background:var(--card-border);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
+        </div>
+        <span style="font-size:12px;color:var(--accent)">${pct}%</span>
+      </div>`;
+    }
+  }
+
+  return `<div class="phase-section">
+    <div class="phase-title">${phaseLabel}</div>
+    ${banner}
+    <div class="match-grid">${matches.map(m=>matchCard(m)).join('')}</div>
+  </div>`;
 }
 
 </script>
