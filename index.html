@@ -1911,27 +1911,37 @@ function computeBracket(results) {
   for (const t of thirdPlaced) thirdByGroup[t.group] = t.teamId;
   const get3rd = k => slots ? (thirdByGroup[slots[k]] || null) : null;
 
-  // Step 4: populate Round of 32 (matches 73-88)
-  // Fixed matchups (no 3rd place)
-  bracket[73] = { home: get2nd('A'), away: get2nd('B') };
-  bracket[75] = { home: get1st('F'), away: get2nd('C') };
-  bracket[76] = { home: get1st('C'), away: get2nd('F') };
-  bracket[78] = { home: get2nd('E'), away: get2nd('I') };
-  bracket[83] = { home: get2nd('K'), away: get2nd('L') };
-  bracket[84] = { home: get1st('H'), away: get2nd('J') };
-  bracket[86] = { home: get1st('J'), away: get2nd('H') };
-  bracket[88] = { home: get2nd('D'), away: get2nd('G') };
+  // Step 4: populate Round of 32 — matches exactly as labeled in MATCHES array
+  // 73: 1A vs 2B  |  74: 1B vs 2A  |  75: 1C vs 2D  |  76: 1D vs 2C
+  // 77: 1E vs 2F  |  78: 1F vs 2E  |  79: 1G vs 2H  |  80: 1H vs 2G
+  // 81: 1I vs 2J  |  82: 1J vs 2I  |  83: 1K vs 2L  |  84: 1L vs 2K
+  // 85-88: best 3rd-place teams (assigned via AssignThird table)
+  bracket[73] = { home: get1st('A'), away: get2nd('B') };
+  bracket[74] = { home: get1st('B'), away: get2nd('A') };
+  bracket[75] = { home: get1st('C'), away: get2nd('D') };
+  bracket[76] = { home: get1st('D'), away: get2nd('C') };
+  bracket[77] = { home: get1st('E'), away: get2nd('F') };
+  bracket[78] = { home: get1st('F'), away: get2nd('E') };
+  bracket[79] = { home: get1st('G'), away: get2nd('H') };
+  bracket[80] = { home: get1st('H'), away: get2nd('G') };
+  bracket[81] = { home: get1st('I'), away: get2nd('J') };
+  bracket[82] = { home: get1st('J'), away: get2nd('I') };
+  bracket[83] = { home: get1st('K'), away: get2nd('L') };
+  bracket[84] = { home: get1st('L'), away: get2nd('K') };
 
-  // 3rd-place dependent matchups (use AssignThird table)
-  if (slots) {
-    bracket[79] = { home: get1st('A'), away: get3rd(slots.m79) };
-    bracket[85] = { home: get1st('B'), away: get3rd(slots.m85) };
-    bracket[81] = { home: get1st('D'), away: get3rd(slots.m81) };
-    bracket[74] = { home: get1st('E'), away: get3rd(slots.m74) };
-    bracket[82] = { home: get1st('G'), away: get3rd(slots.m82) };
-    bracket[77] = { home: get1st('I'), away: get3rd(slots.m77) };
-    bracket[87] = { home: get1st('K'), away: get3rd(slots.m87) };
-    bracket[80] = { home: get1st('L'), away: get3rd(slots.m80) };
+  // Matches 85-88: best 8 third-place teams, 2 per match
+  // Assign in ranked order: best vs 5th, 2nd vs 6th, 3rd vs 7th, 4th vs 8th
+  if (best8.length >= 2) {
+    bracket[85] = { home: best8[0]?.teamId||null, away: best8[4]?.teamId||null };
+  }
+  if (best8.length >= 4) {
+    bracket[86] = { home: best8[1]?.teamId||null, away: best8[5]?.teamId||null };
+  }
+  if (best8.length >= 6) {
+    bracket[87] = { home: best8[2]?.teamId||null, away: best8[6]?.teamId||null };
+  }
+  if (best8.length >= 8) {
+    bracket[88] = { home: best8[3]?.teamId||null, away: best8[7]?.teamId||null };
   }
 
   // Step 5: populate later rounds — only when previous phase is complete
