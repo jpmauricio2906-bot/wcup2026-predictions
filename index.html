@@ -1024,7 +1024,7 @@ function matchCard(m) {
   if (!m.group) {
     // Predicted penalty row — show when prediction is a draw
     const predIsDraw = hasPred && pred.home === pred.away;
-    const predPenDisabled = !predIsDraw || !editable ? 'disabled' : '';
+    const predPenDisabled = !predIsDraw || !editable || hasResult ? 'disabled' : '';
     const predPenNote = !predIsDraw ? '<span class="pen-note">(enabled on draw)</span>' : '';
     const php = pred?.home_pen ?? '', pap = pred?.away_pen ?? '';
     predPenRow = `<div class="match-row row-penalties">
@@ -1115,7 +1115,13 @@ function onScore(matchId) {
   if(h===''||a==='') return;
   const hi=parseInt(h), ai=parseInt(a);
   if(isNaN(hi)||isNaN(ai)||hi<0||ai<0) return;
-  myPredictions[matchId]={home:hi,away:ai};
+  const oldPred = myPredictions[matchId] || {};
+  myPredictions[matchId] = {
+    home: hi,
+    away: ai,
+    home_pen: (matchId >= 73 && hi === ai) ? (oldPred.home_pen ?? null) : null,
+    away_pen: (matchId >= 73 && hi === ai) ? (oldPred.away_pen ?? null) : null
+  };
   const card=document.getElementById(`mc-${matchId}`);
   if(card&&!card.classList.contains('has-prediction')) card.classList.add('has-prediction');
   let ind=card?.querySelector('.save-ind');
@@ -2130,19 +2136,14 @@ function computeGroupStandings(group, results) {
 function computeBracket(results, partial=false) {
   const bracket = {}; // matchId -> { home: teamId, away: teamId }
 
-  // Gate: phases unlock progressively based on partial/full results
-  const r32Count = Object.keys(results).filter(id=>parseInt(id)>=73&&parseInt(id)<=88).length;
-  const r16Count = Object.keys(results).filter(id=>parseInt(id)>=89&&parseInt(id)<=96).length;
-  const qfCount  = Object.keys(results).filter(id=>parseInt(id)>=97&&parseInt(id)<=100).length;
-  const sfCount  = Object.keys(results).filter(id=>parseInt(id)>=101&&parseInt(id)<=102).length;
-
-  // partial=true: used for predicted bracket (shows next round as soon as any match filled)
-  // partial=false: used for real bracket (requires full phase completion)
-  const r32Done = partial ? r32Count >= 1  : r32Count >= 16;
-  const r16Done = partial ? r16Count >= 1  : r16Count >= 8;
-  const qfDone  = partial ? qfCount  >= 1  : qfCount  >= 4;
-  const sfDone  = partial ? sfCount  >= 1  : sfCount  >= 2;
-
+  // Gate: phases unlock progressively based on actual computable winners.
+  // For predicted brackets (partial=true), this lets the next round show as soon as
+  // the relevant feeder matches have winners. For official brackets (partial=false),
+  // it waits for the previous phase to be fully resolved.
+  const R32_IDS = Array.from({length:16},(_,i)=>i+73);
+  const R16_IDS = Array.from({length:8}, (_,i)=>i+89);
+  const QF_IDS  = Array.from({length:4}, (_,i)=>i+97);
+  const SF_IDS  = [101,102];
 
   // Step 1: compute all group standings
   const groupStandings = {};
@@ -2216,26 +2217,31 @@ function computeBracket(results, partial=false) {
   bracket[87] = { home: t(2), away: t(6) };
   bracket[88] = { home: t(3), away: t(7) };
 
-  // Step 5: populate later rounds — only when previous phase is complete
-  // Winner of match = team that scored more goals (from results)
+  // Step 5: populate later rounds from computable winners.
+  // Knockout matches may be tied after regulation; in that case a penalty winner is
+  // required before the next-round slot can be determined.
   const getWinner = (mid) => {
     const r = results[mid], b = bracket[mid];
     if (!r || !b) return null;
-    // If one side is null (group not yet predicted), return the known side
-    if (!b.home && b.away) return b.away;
-    if (!b.away && b.home) return b.home;
-    const w = getMatchWinner(r, true); // true = isKnockout
+    if (!b.home || !b.away) return null; // both teams must be known for a real winner
+    const w = getMatchWinner(r, true); // true = knockout; penalties decide regulation draws
     return w === 'home' ? b.home : w === 'away' ? b.away : null;
   };
   const getLoser = (mid) => {
     const r = results[mid], b = bracket[mid];
-    if (!r || !b) return null;
-    if (!b.home || !b.away) return null; // can't determine loser if teams unknown
+    if (!r || !b || !b.home || !b.away) return null;
     const w = getMatchWinner(r, true);
     return w === 'home' ? b.away : w === 'away' ? b.home : null;
   };
+  const hasAnyWinner = ids => ids.some(id => !!getWinner(id));
+  const hasAllWinners = ids => ids.every(id => !!getWinner(id));
 
-  // Round of 16 — only when all R32 results are in
+  const r32Done = partial ? hasAnyWinner(R32_IDS) : hasAllWinners(R32_IDS);
+  const r16Done = partial ? hasAnyWinner(R16_IDS) : hasAllWinners(R16_IDS);
+  const qfDone  = partial ? hasAnyWinner(QF_IDS)  : hasAllWinners(QF_IDS);
+  const sfDone  = partial ? hasAnyWinner(SF_IDS)  : hasAllWinners(SF_IDS);
+
+  // Round of 16 — show any slot whose two feeder winners are known
   if (!r32Done) return bracket;
   bracket[89] = { home: getWinner(74), away: getWinner(77) };
   bracket[90] = { home: getWinner(73), away: getWinner(75) };
@@ -2321,17 +2327,28 @@ async function confirmPhase(phaseKey) {
   if (!currentUser) return;
   const phase = PHASES.find(p=>p.key===phaseKey);
   if (!phase) return;
-  // Verify all matches in phase are predicted
+  // Verify all matches in phase are predicted, and knockout draws have penalty winners.
   const missing = phase.matchIds.filter(id => myPredictions[id]===undefined);
   if (missing.length > 0) {
     showToast(`Fill all ${missing.length} remaining predictions first`, 'error');
     return;
   }
+  if (phaseKey !== 'group') {
+    const missingPens = phase.matchIds.filter(id => {
+      const p = myPredictions[id];
+      if (!p || p.home !== p.away) return false;
+      return p.home_pen == null || p.away_pen == null || p.home_pen === p.away_pen;
+    });
+    if (missingPens.length > 0) {
+      showToast(`Add penalty winners for ${missingPens.length} tied knockout prediction${missingPens.length!==1?'s':''}`, 'error');
+      return;
+    }
+  }
   if (!confirm(`Confirm your ${phase.label} predictions? They will be locked and cannot be changed.`)) return;
 
   // Optimistically update UI immediately — don't wait for network
   playerConfirmations.add(phaseKey);
-  try { _predictedBracket = computeBracket(myPredictions); } catch(e) {}
+  try { _predictedBracket = computeBracket(myPredictions, true); } catch(e) {}
   try { _computedBracket  = computeBracket(matchResults);  } catch(e) {}
   showToast(`${phase.label} predictions confirmed! ✓`, 'success');
   renderMatches();
