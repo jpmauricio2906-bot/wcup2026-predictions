@@ -590,7 +590,7 @@ async function loadProfile() {
   }
   myPredictions = await loadMyPredictions();
   matchResults   = await loadMatchResults();
-  refreshBracket();
+  refreshBracket(); // also computes _predictedBracket inside
   if (currentProfile?.is_admin) addAdminTab();
   else removeAdminTab();
 }
@@ -743,7 +743,8 @@ function matchCard(m) {
     </div>`;
   } else {
     // Get computed bracket teams for this knockout match
-    const bkt = _computedBracket[m.id] || {};
+    // Use real results bracket; fall back to predicted bracket if no real result yet
+    const bkt = (_computedBracket[m.id]?.home ? _computedBracket[m.id] : _predictedBracket[m.id]) || {};
     const hTeam = bkt.home, aTeam = bkt.away;
     const hKN = hTeam ? (TEAMS[hTeam]||'?') : 'TBD';
     const aKN = aTeam ? (TEAMS[aTeam]||'?') : 'TBD';
@@ -790,6 +791,8 @@ function onScore(matchId) {
     if(!error&&ind) ind.innerHTML=`<span class="dot-saved"></span>Saved`;
     const cnt=Object.keys(myPredictions).length;
     document.getElementById('authPredCount').textContent=`${cnt} predictions saved`;
+    // Refresh predicted bracket so Round of 32 updates as predictions come in
+    try { _predictedBracket = computeBracket(myPredictions); } catch(e) {}
   },600);
 }
 
@@ -1717,21 +1720,19 @@ function computeGroupStandings(group, results) {
 function computeBracket(results) {
   const bracket = {}; // matchId -> { home: teamId, away: teamId }
 
-  // Gate: only compute bracket if enough group results are in
-  // Each phase unlocks when all matches in the previous phase have results
-  const groupResultCount = Object.keys(results).filter(id => parseInt(id) <= 72).length;
+  // Gate: phases unlock progressively — no minimum required for group stage
+  // Round of 32 shows best available standings even with partial group results
   const r32ResultCount   = Object.keys(results).filter(id => parseInt(id) >= 73 && parseInt(id) <= 88).length;
   const r16ResultCount   = Object.keys(results).filter(id => parseInt(id) >= 89 && parseInt(id) <= 96).length;
   const qfResultCount    = Object.keys(results).filter(id => parseInt(id) >= 97 && parseInt(id) <= 100).length;
   const sfResultCount    = Object.keys(results).filter(id => parseInt(id) >= 101 && parseInt(id) <= 102).length;
 
-  const groupComplete = groupResultCount >= 72;
   const r32Complete   = r32ResultCount >= 16;
   const r16Complete   = r16ResultCount >= 8;
   const qfComplete    = qfResultCount >= 4;
   const sfComplete    = sfResultCount >= 2;
 
-  if (!groupComplete) return {}; // No group stage done = no bracket yet
+  // Always compute group standings — bracket shows best available projection
 
   // Step 1: compute all group standings
   const groupStandings = {};
@@ -1849,6 +1850,7 @@ function computeBracket(results) {
 
 // Expose bracket globally so renderMatches can use it
 let _computedBracket = {};
+let _predictedBracket = {};
 
 function refreshBracket() {
   try {
@@ -1856,6 +1858,11 @@ function refreshBracket() {
   } catch(e) {
     console.error('Bracket computation error:', e);
     _computedBracket = {};
+  }
+  try {
+    _predictedBracket = computeBracket(myPredictions);
+  } catch(e) {
+    _predictedBracket = {};
   }
 }
 
