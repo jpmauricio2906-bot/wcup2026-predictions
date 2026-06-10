@@ -2711,6 +2711,26 @@ const FIFA_RANK = {
  61:61,63:63,65:65,69:69,74:74,82:82,83:83,85:85
 };
 
+// Best-third-place tiebreaker hook.
+// FIFA logic for selecting the 8 best third-place teams:
+// points → goal difference → goals scored → Fair Play/team conduct → FIFA ranking.
+// Higher fair-play score is better. If no fair-play data is available,
+// all teams are equal on this criterion and the app falls back to FIFA ranking.
+const FAIR_PLAY_SCORE = {};
+
+function getFairPlayScore(teamId) {
+ return teamId && FAIR_PLAY_SCORE[teamId] != null ? Number(FAIR_PLAY_SCORE[teamId]) : 0;
+}
+
+function compareBestThirdTeams(a, b) {
+ return (b.pts - a.pts)
+  || (b.gd - a.gd)
+  || (b.gf - a.gf)
+  || (b.fairPlay - a.fairPlay)
+  || (a.rank - b.rank)
+  || (a.teamId - b.teamId);
+}
+
 const ASSIGN_THIRD = {
  'EFGHIJKL': {'m79':'E','m85':'J','m81':'I','m74':'F','m82':'H','m77':'G','m87':'L','m80':'K'},
  'DFGHIJKL': {'m79':'H','m85':'G','m81':'I','m74':'D','m82':'J','m77':'F','m87':'L','m80':'K'},
@@ -3294,19 +3314,27 @@ function computeBracket(results, partial=false) {
  // best third-placed groups are assigned to the specific R32 third-place slots.
  const thirdPlaced = 'ABCDEFGHIJKL'.split('')
   .filter(grp => GROUP_TEAMS[grp] && grpHasRes(grp))
-  .map(grp => ({
-   group: grp,
-   teamId: groupStandings[grp]?.[2]?.teamId,
-   pts: groupStandings[grp]?.[2]?.pts || 0,
-   gd:  groupStandings[grp]?.[2]?.gd  || 0,
-   gf:  groupStandings[grp]?.[2]?.gf  || 0,
-   rank: FIFA_RANK[groupStandings[grp]?.[2]?.teamId] || 999
-  }))
+  .map(grp => {
+   const third = groupStandings[grp]?.[2];
+   const teamId = third?.teamId;
+   return {
+    group: grp,
+    teamId,
+    pts: third?.pts || 0,
+    gd:  third?.gd  || 0,
+    gf:  third?.gf  || 0,
+    fairPlay: getFairPlayScore(teamId),
+    rank: FIFA_RANK[teamId] || 999
+   };
+  })
   .filter(t => t.teamId);
 
- thirdPlaced.sort((a,b) => b.pts-a.pts || b.gd-a.gd || b.gf-a.gf || a.rank-b.rank);
+ thirdPlaced.sort(compareBestThirdTeams);
 
  const best8 = thirdPlaced.slice(0, 8);
+ // The Excel/FIFA matrix uses only the set of qualifying third-place groups.
+ // The ranking above decides which 8 groups qualify; the matrix below assigns
+ // those 8 groups into the correct Round-of-32 slots.
  const comboKey = best8.length === 8 ? best8.map(t => t.group).sort().join('') : '';
  const thirdRuleForCombo = comboKey ? (THIRD_ASSIGN_RULES[comboKey] || null) : null;
  const thirdByGroup = {};
