@@ -3535,11 +3535,28 @@ function getUnlockDependency(phaseKey) {
  return idx > 0 ? PHASE_ORDER[idx-1] : null;
 }
 
+function phaseHasSavedPredictions(phaseKey) {
+ const phase = PHASES.find(p=>p.key===phaseKey);
+ if (!phase) return false;
+ return phase.matchIds.some(id => myPredictions[id] !== undefined);
+}
+
 function isPhaseEditable(phaseKey) {
  if (playerConfirmations.has(phaseKey)) return false; // already confirmed = locked
  const depKey = getUnlockDependency(phaseKey);
  if (!depKey) return true; // group stage always editable if not confirmed
- return playerConfirmations.has(depKey);
+
+ // Normal flow: later phases unlock only after the dependency is confirmed.
+ if (playerConfirmations.has(depKey)) return true;
+
+ // Admin-unlock flow:
+ // If a later phase was previously completed and then unlocked by the admin,
+ // it already has saved predictions. Allow editing even if the previous phase
+ // was also unlocked, otherwise "unlock all stages" would leave only Group
+ // Stage editable.
+ if (phaseHasSavedPredictions(phaseKey)) return true;
+
+ return false;
 }
 
 // Is a phase visible (teams shown in preview)?
@@ -3548,6 +3565,11 @@ function isPhaseEditable(phaseKey) {
 function isPhaseVisible(phaseKey) {
  const depKey = getUnlockDependency(phaseKey);
  if (!depKey) return true;
+
+ // If this phase already has saved predictions, show it. This matters when an
+ // admin unlocks several completed phases at once.
+ if (phaseHasSavedPredictions(phaseKey)) return true;
+
  // Show teams if the unlocking phase has at least 1 prediction filled.
  // Third Place and Final both depend directly on the Semi-Finals.
  const depPhase = PHASES.find(p=>p.key===depKey);
