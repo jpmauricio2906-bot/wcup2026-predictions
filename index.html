@@ -1353,7 +1353,7 @@ function safeHtml(v) {
 }
 
 function formatScorePair(obj) {
- if (!obj) return '<span class="muted">—</span>';
+ if (!obj) return '<span class="muted">No prediction</span>';
  const reg = `${obj.home}–${obj.away}`;
  const pens = obj.home_pen != null && obj.away_pen != null ? ` <span class="muted">(P ${obj.home_pen}–${obj.away_pen})</span>` : '';
  return `${reg}${pens}`;
@@ -1376,11 +1376,29 @@ function adminPhaseLabelForMatch(m) {
  return m.group ? `Group ${m.group}` : (m.phase || 'Knockout');
 }
 
+function adminPredictionPhaseButton(label, active) {
+ const safe = safeHtml(label);
+ return `<button class="admin-phase-chip${active?' active':''}" onclick="adminSetPredictionViewerPhase('${safe}')">${safe}</button>`;
+}
+
+let _adminViewerPlayerId = '';
+let _adminViewerPhase = 'All';
+
+function adminSetPredictionViewerPhase(phase) {
+ _adminViewerPhase = phase || 'All';
+ renderAdminUserPredictions(_adminViewerPlayerId);
+}
+
 async function renderAdminUserPredictions(playerId) {
  const viewer = document.getElementById('adminUserPredictionViewer');
  if (!viewer || !currentProfile?.is_admin) return;
- if (!playerId) {
-  viewer.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px 0">Select a player to view their predictions.</div>';
+ _adminViewerPlayerId = playerId || _adminViewerPlayerId || '';
+ if (!_adminViewerPlayerId) {
+  viewer.innerHTML = `<div class="admin-user-empty">
+   <div class="big">👀</div>
+   <div style="font-weight:900;color:var(--page-text);margin-bottom:4px">Select a user</div>
+   <div>Choose a player above to view predictions next to official results.</div>
+  </div>`;
   return;
  }
 
@@ -1388,7 +1406,7 @@ async function renderAdminUserPredictions(playerId) {
 
  try {
   const token = await getAuthToken();
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?player_id=eq.${encodeURIComponent(playerId)}&select=match_id,home_score,away_score,home_pen,away_pen&order=match_id.asc`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/predictions?player_id=eq.${encodeURIComponent(_adminViewerPlayerId)}&select=match_id,home_score,away_score,home_pen,away_pen&order=match_id.asc`, {
    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${token}` }
   });
   if (!res.ok) throw new Error(await res.text());
@@ -1406,70 +1424,96 @@ async function renderAdminUserPredictions(playerId) {
   const selected = document.getElementById('adminPredictionUserSelect');
   const playerName = selected?.selectedOptions?.[0]?.textContent || 'Selected user';
 
-  const playedIds = MATCHES.filter(m => matchResults[m.id]).map(m => m.id);
-  let totalPts = 0, scoredMatches = 0, exact = 0, correct = 0, saved = Object.keys(predMap).length;
-  for (const id of playedIds) {
-   const pred = predMap[id];
-   const result = matchResults[id];
+  const phases = ['All','Group Stage','Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
+  if (!phases.includes(_adminViewerPhase)) _adminViewerPhase = 'All';
+
+  let totalPts = 0, scoredMatches = 0, exact = 0, positive = 0, saved = Object.keys(predMap).length;
+  for (const m of MATCHES) {
+   const pred = predMap[m.id];
+   const result = matchResults[m.id];
    const pts = calcPts(pred, result);
    if (pts !== null) {
     scoredMatches++;
     totalPts += pts;
     if (pred && pred.home === result.home && pred.away === result.away) exact++;
-    if (pts > 0) correct++;
+    if (pts > 0) positive++;
    }
   }
 
-  const phases = ['Group Stage','Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
-  const phaseMap = {};
+  const phaseButtons = phases.map(ph => adminPredictionPhaseButton(ph, ph === _adminViewerPhase)).join('');
+
+  const grouped = {};
   for (const m of MATCHES) {
-   const ph = m.group ? 'Group Stage' : m.phase;
-   if (!phaseMap[ph]) phaseMap[ph] = [];
-   phaseMap[ph].push(m);
+   const phase = m.group ? 'Group Stage' : m.phase;
+   if (_adminViewerPhase !== 'All' && phase !== _adminViewerPhase) continue;
+   if (!grouped[phase]) grouped[phase] = [];
+   grouped[phase].push(m);
   }
 
-  const phaseHtml = phases.map(phase => {
-   const matches = phaseMap[phase] || [];
+  const phaseOrder = ['Group Stage','Round of 32','Round of 16','Quarter-Finals','Semi-Finals','Third Place','Final'];
+  const phaseHtml = phaseOrder.map(phase => {
+   const matches = grouped[phase] || [];
    if (!matches.length) return '';
+   const predictedCount = matches.filter(m => predMap[m.id]).length;
+   const resultCount = matches.filter(m => matchResults[m.id]).length;
+
    const rowsHtml = matches.map(m => {
     const pred = predMap[m.id];
     const result = matchResults[m.id];
     const pts = calcPts(pred, result);
-    return `<div class="user-pred-row">
-     <div><strong>M${m.id}</strong></div>
-     <div class="teams">${adminMatchTeamsLabel(m)} <span class="muted">· ${safeHtml(adminPhaseLabelForMatch(m))}</span></div>
-     <div>${formatScorePair(pred)}</div>
-     <div>${formatScorePair(result)}</div>
-     <div class="pts-cell">${pts === null ? '<span class="muted">—</span>' : pts}</div>
+    const ptsClass = pts === null ? 'admin-points-badge none' : 'admin-points-badge';
+    return `<div class="admin-pred-card">
+     <div><span class="admin-match-pill">M${m.id}</span></div>
+     <div>
+      <div class="admin-teams-main">${adminMatchTeamsLabel(m)}</div>
+      <div class="admin-teams-sub">${safeHtml(adminPhaseLabelForMatch(m))}${m.date ? ' · ' + safeHtml(formatShortDate(m.date)) : ''}</div>
+     </div>
+     <div class="admin-score-box">
+      <div class="admin-score-label">Prediction</div>
+      <div class="admin-score-value">${formatScorePair(pred)}</div>
+     </div>
+     <div class="admin-score-box">
+      <div class="admin-score-label">Official</div>
+      <div class="admin-score-value">${formatScorePair(result)}</div>
+     </div>
+     <div class="${ptsClass}">${pts === null ? '—' : pts + ' pts'}</div>
     </div>`;
    }).join('');
-   return `<div class="user-pred-phase">
-    <div class="user-pred-phase-title">${safeHtml(phase)}</div>
-    <div class="user-pred-table">
-     <div class="user-pred-row header"><div>Match</div><div>Teams</div><div>Prediction</div><div>Official</div><div>Pts</div></div>
-     ${rowsHtml}
+
+   return `<div class="admin-pred-section">
+    <div class="admin-pred-section-title">
+     <span>${safeHtml(phase)}</span>
+     <small>${predictedCount}/${matches.length} predicted · ${resultCount}/${matches.length} official results</small>
     </div>
+    <div class="admin-pred-list">${rowsHtml}</div>
    </div>`;
   }).join('');
 
   viewer.innerHTML = `
-   <div style="margin-top:14px">
-    <div style="font-weight:900;color:var(--page-text);font-size:18px">Read-only predictions: ${safeHtml(playerName)}</div>
-    <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Admin view only. This panel does not edit user predictions.</div>
-    <div class="admin-summary-grid">
-     <div class="admin-summary-tile"><div class="num">${totalPts}</div><div class="lbl">Total points</div></div>
-     <div class="admin-summary-tile"><div class="num">${saved}</div><div class="lbl">Predictions saved</div></div>
-     <div class="admin-summary-tile"><div class="num">${scoredMatches}</div><div class="lbl">Scored matches</div></div>
-     <div class="admin-summary-tile"><div class="num">${exact}</div><div class="lbl">Exact scores</div></div>
-     <div class="admin-summary-tile"><div class="num">${correct}</div><div class="lbl">Positive scores</div></div>
+   <div class="admin-user-headline">
+    <div>
+     <div class="admin-user-name">${safeHtml(playerName)}</div>
+     <div class="admin-user-note">Read-only admin view. Predictions cannot be edited here.</div>
     </div>
-    ${phaseHtml}
-   </div>`;
+   </div>
+
+   <div class="admin-summary-grid pro">
+    <div class="admin-summary-tile pro"><div class="num">${totalPts}</div><div class="lbl">Total points</div></div>
+    <div class="admin-summary-tile pro"><div class="num">${saved}</div><div class="lbl">Saved picks</div></div>
+    <div class="admin-summary-tile pro"><div class="num">${scoredMatches}</div><div class="lbl">Scored matches</div></div>
+    <div class="admin-summary-tile pro"><div class="num">${exact}</div><div class="lbl">Exact scores</div></div>
+    <div class="admin-summary-tile pro"><div class="num">${positive}</div><div class="lbl">Positive scores</div></div>
+   </div>
+
+   <div class="admin-phase-filter">${phaseButtons}</div>
+   ${phaseHtml || '<div class="admin-user-empty">No matches found for this filter.</div>'}
+  `;
  } catch(e) {
   console.error('renderAdminUserPredictions error', e);
   viewer.innerHTML = '<div style="font-size:13px;color:var(--wrong-border);padding:12px 0">Could not load this user’s predictions.</div>';
  }
 }
+
 
 // ===== ADMIN TAB =====
 function addAdminTab() {
@@ -1487,66 +1531,102 @@ function renderInstructions() {
  if (!container) return;
  container.innerHTML = `
   <div class="instructions-wrap">
-   <div class="info-card">
-    <h2>📘 How to Play</h2>
-    <p>This is a stage-by-stage World Cup prediction game. You predict only the matches whose teams are officially known. Future rounds can appear as projections, but they are read-only until the previous stage is complete.</p>
-    <div class="rule-grid">
-     <div class="rule-tile"><strong>1. Predict the current stage</strong><span>Start with the Group Stage. Later rounds open only when the official matchups are known.</span></div>
-     <div class="rule-tile"><strong>2. Match deadline</strong><span>Each match locks at 12:00 AM US Eastern time on the calendar day of the match.</span></div>
-     <div class="rule-tile"><strong>3. Missed match</strong><span>If you miss one match, it stays blank and scores zero. You can still predict future open matches.</span></div>
-     <div class="rule-tile"><strong>4. Official results</strong><span>Admin enters official scores. Your points appear when a result is available.</span></div>
+   <div class="instructions-hero">
+    <div class="instructions-kicker">World Cup 2026 prediction game</div>
+    <h1 class="instructions-title">How to Play</h1>
+    <p class="instructions-subtitle">Predict the tournament one stage at a time. You only predict matches whose teams are officially known, while future rounds can still appear as read-only projections.</p>
+    <div class="quick-steps">
+     <div class="quick-step">
+      <div class="quick-step-num">1</div>
+      <div class="quick-step-title">Predict open matches</div>
+      <div class="quick-step-text">Start with the Group Stage. Later rounds open only when the official matchups are known.</div>
+     </div>
+     <div class="quick-step">
+      <div class="quick-step-num">2</div>
+      <div class="quick-step-title">Watch the deadline</div>
+      <div class="quick-step-text">Each match locks at midnight US Eastern time on the calendar day of that match.</div>
+     </div>
+     <div class="quick-step">
+      <div class="quick-step-num">3</div>
+      <div class="quick-step-title">Confirm your phase</div>
+      <div class="quick-step-text">When your still-open predictions are complete, confirm and lock that stage.</div>
+     </div>
+     <div class="quick-step">
+      <div class="quick-step-num">4</div>
+      <div class="quick-step-title">Score points</div>
+      <div class="quick-step-text">Points appear when Admin enters official results.</div>
+     </div>
     </div>
    </div>
 
-   <div class="info-card">
-    <h3>🏆 Scoring</h3>
-    <ul>
-     <li><strong>3 points</strong> for the exact regulation score.</li>
-     <li><strong>2 points</strong> for the correct goal difference.</li>
-     <li><strong>1 point</strong> for the correct winner/draw result.</li>
-     <li>For knockout matches decided by penalties, there is an additional penalty-winner bonus when applicable.</li>
-    </ul>
+   <div class="instructions-section-title">Core Rules</div>
+   <div class="rules-panel">
+    <div class="rule-card">
+     <div class="rule-icon">🔒</div>
+     <h3>Match deadline</h3>
+     <p>Predictions close at <strong>12:00 AM US Eastern time</strong> on the match date. A June 18 match locks at 12:00 AM ET on June 18.</p>
+    </div>
+    <div class="rule-card">
+     <div class="rule-icon">🎯</div>
+     <h3>Missed games</h3>
+     <p>If you miss one match, it remains blank and scores zero. You can still play future matches that are open.</p>
+    </div>
+    <div class="rule-card">
+     <div class="rule-icon">🔭</div>
+     <h3>Projected rounds</h3>
+     <p>Future rounds may appear as projections based on official results. They are read-only until the previous stage is complete.</p>
+    </div>
+    <div class="rule-card">
+     <div class="rule-icon">🥉</div>
+     <h3>Best third-place teams</h3>
+     <p>The eight best third-place teams are ranked by points, goal difference, goals scored, Fair Play, and FIFA ranking.</p>
+    </div>
    </div>
 
-   <div class="info-card">
-    <h3>🌍 Best third-place teams</h3>
-    <p>The eight best third-place teams are selected using the official-style order: points, goal difference, goals scored, Fair Play, and finally FIFA ranking as the fallback.</p>
+   <div class="instructions-section-title">Scoring</div>
+   <div class="rule-card">
+    <div class="scoring-list">
+     <div class="scoring-item"><span>Exact regulation score</span><span class="scoring-points">3 pts</span></div>
+     <div class="scoring-item"><span>Correct goal difference</span><span class="scoring-points">2 pts</span></div>
+     <div class="scoring-item"><span>Correct winner/draw result</span><span class="scoring-points">1 pt</span></div>
+     <div class="scoring-item"><span>Correct penalty winner in knockout draw</span><span class="scoring-points">+1 pt</span></div>
+    </div>
    </div>
 
-   <div class="info-card">
-    <h3>🔭 Live bracket and projections</h3>
-    <p>The Bracket tab is based on official results entered by Admin. During a stage, projected future matchups may appear and change as results are entered. Those projected matchups cannot be predicted until the stage is officially open.</p>
+   <div class="notice-card">
+    <strong>Live bracket:</strong> The Bracket tab uses official results entered by Admin. It may show projected future matchups while a stage is underway, but users can only predict official matchups once that stage opens.
    </div>
 
-   <div class="info-card">
-    <h3>Questions & Answers</h3>
-    <div class="faq-item">
-     <div class="faq-q">Why can I see a future matchup but not edit it?</div>
-     <div class="faq-a">That matchup is only a projection based on the current official results. Predictions open only after the previous stage is complete and the matchup is official.</div>
-    </div>
-    <div class="faq-item">
-     <div class="faq-q">What happens if I forget to predict one game?</div>
-     <div class="faq-a">That game remains blank and scores zero, but you can continue playing the rest of the open matches.</div>
-    </div>
-    <div class="faq-item">
-     <div class="faq-q">When exactly does a match lock?</div>
-     <div class="faq-a">At midnight US Eastern time on the day of the match. For example, a June 18 match locks at 12:00 AM ET on June 18.</div>
-    </div>
-    <div class="faq-item">
-     <div class="faq-q">Can I change a prediction after the deadline?</div>
-     <div class="faq-a">No. Once the match deadline has passed, that match is locked.</div>
-    </div>
-    <div class="faq-item">
-     <div class="faq-q">Why are old full-tournament predictions not used anymore?</div>
-     <div class="faq-a">The live game now works stage by stage. Old knockout predictions were preserved as archive/mock data, but live scoring uses only predictions made for official matchups.</div>
-    </div>
-    <div class="faq-item">
-     <div class="faq-q">Do I need to confirm a whole phase?</div>
-     <div class="faq-a">Yes, when your still-open predictions for that phase are complete, confirm the phase to lock it. Missed matches that are already deadline-locked stay blank.</div>
-    </div>
+   <div class="instructions-section-title">Questions & Answers</div>
+   <div class="faq-grid">
+    <details class="faq-card" open>
+     <summary>Why can I see a future matchup but not edit it?</summary>
+     <div class="faq-answer">That matchup is only a projection based on current official results. It can still change. Predictions open only after the previous stage is complete and the matchup is official.</div>
+    </details>
+    <details class="faq-card">
+     <summary>What happens if I forget to predict one game?</summary>
+     <div class="faq-answer">That game remains blank and scores zero. You can continue predicting other future matches as long as they are still open.</div>
+    </details>
+    <details class="faq-card">
+     <summary>When exactly does a match lock?</summary>
+     <div class="faq-answer">At midnight US Eastern time on the calendar day of the match. You can edit until 11:59 PM ET the day before.</div>
+    </details>
+    <details class="faq-card">
+     <summary>Can Admin change my prediction?</summary>
+     <div class="faq-answer">No. Admin can view predictions and enter official results, but the Admin user-prediction viewer is read-only.</div>
+    </details>
+    <details class="faq-card">
+     <summary>Why are old full-tournament predictions not used?</summary>
+     <div class="faq-answer">The live game is now stage-by-stage. Old knockout predictions were preserved separately as mock/archive data, but live scoring uses official matchups only.</div>
+    </details>
+    <details class="faq-card">
+     <summary>Do I need to confirm a whole phase?</summary>
+     <div class="faq-answer">Yes. Once your still-open predictions for a stage are complete, confirm the phase. Already locked missed matches remain blank.</div>
+    </details>
    </div>
   </div>`;
 }
+
 
 function showSection(name, btn) {
  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
@@ -2695,16 +2775,30 @@ async function renderAdmin() {
    <div style="font-size:12px;color:var(--text-subtle);margin-top:8px">Use the unlock buttons to re-open a confirmed phase for a player.</div>
   </div>
 
-  <div class="admin-viewer-panel">
-   <div class="admin-title">View User Predictions</div>
-   <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Select a user to see their saved predictions next to official results. This is read-only.</div>
-   <div class="admin-viewer-controls">
-    <select class="admin-select" id="adminPredictionUserSelect" onchange="renderAdminUserPredictions(this.value)">
-     <option value="">Select user…</option>
-     ${(players||[]).filter(p=>!p.is_admin).map(p=>`<option value="${p.id}">${safeHtml(p.display_name)}</option>`).join('')}
-    </select>
+  <div class="admin-viewer-panel pro">
+   <div class="admin-viewer-head">
+    <div class="admin-viewer-title">View User Predictions</div>
+    <div class="admin-viewer-sub">Read-only dashboard for reviewing a player’s saved predictions, official results, and points by match.</div>
+    <div class="admin-viewer-controls pro">
+     <div class="admin-field">
+      <label>Select player</label>
+      <select class="admin-select pro" id="adminPredictionUserSelect" onchange="_adminViewerPhase='All';renderAdminUserPredictions(this.value)">
+       <option value="">Select user…</option>
+       ${(players||[]).filter(p=>!p.is_admin).map(p=>`<option value="${p.id}">${safeHtml(p.display_name)}</option>`).join('')}
+      </select>
+     </div>
+     <button class="btn btn-secondary" style="padding:10px 14px" onclick="renderAdminUserPredictions(document.getElementById('adminPredictionUserSelect')?.value)">Refresh</button>
+    </div>
    </div>
-   <div id="adminUserPredictionViewer"><div style="font-size:13px;color:var(--text-muted);padding:12px 0">Select a player to view their predictions.</div></div>
+   <div class="admin-viewer-body">
+    <div id="adminUserPredictionViewer">
+     <div class="admin-user-empty">
+      <div class="big">👀</div>
+      <div style="font-weight:900;color:var(--page-text);margin-bottom:4px">Select a user</div>
+      <div>Choose a player above to review predictions next to official results.</div>
+     </div>
+    </div>
+   </div>
   </div>
 
   ${phases.map(phase=>{
