@@ -582,6 +582,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--page-bg);color:var(--page
  .admin-pred-table-wrap{max-height:none;}
 }
 
+
+.help-search-count{font-size:12px;color:var(--text-muted);margin-top:4px;}
+.help-no-results{border:1px dashed var(--card-border);background:var(--input-bg);border-radius:18px;padding:28px;text-align:center;color:var(--text-muted);}
+.help-result-tag{display:inline-flex;align-items:center;border-radius:999px;background:var(--pill-bg);border:1px solid var(--card-border);color:var(--pill-text);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;padding:4px 7px;margin-bottom:7px;}
+
 </style>
 </head>
 <body>
@@ -1607,89 +1612,181 @@ function addAdminTab() {
 function removeAdminTab() { document.getElementById('adminTab')?.remove(); }
 
 // ===== SECTION NAV =====
+const HELP_CATEGORIES = [
+ ['popular','⭐ Most Popular'],
+ ['getting','🚀 Getting Started'],
+ ['deadlines','🔒 Deadlines'],
+ ['scoring','🏆 Scoring'],
+ ['bracket','🔭 Bracket'],
+ ['thirds','🥉 Best Third Places'],
+ ['account','👤 Account'],
+ ['admin','⚙️ Admin / Results']
+];
+
+const HELP_ARTICLES = {
+ popular: [
+  ['🚀','How the game works','Predict only the current official stage. The Group Stage is open first. Later rounds open only when the prior stage is finished and official matchups are known.'],
+  ['🔒','When predictions lock','Each match locks at 12:00 AM US Eastern time on the calendar day of that match. You can edit until 11:59 PM ET the day before.'],
+  ['🔭','Why future rounds can appear','The Bracket can show projected future matchups based on official results already entered by Admin. These projections are read-only and can change.'],
+  ['🏆','How scoring works','Exact regulation score gives 3 points, correct goal difference gives 2, correct result gives 1, and knockout penalty winner can add 1 point.']
+ ],
+ getting: [
+  ['1️⃣','Step 1 — Fill open predictions','Go to Predictions and enter scores for the currently open stage. At the start, that is the Group Stage.'],
+  ['2️⃣','Step 2 — Save automatically','Scores save as you type. A Saved indicator appears after the app confirms the prediction.'],
+  ['3️⃣','Step 3 — Confirm the stage','When your still-open matches are complete, confirm the phase to lock your predictions.'],
+  ['4️⃣','Step 4 — Keep playing','If you miss a locked game, it stays blank and scores zero, but future open matches remain playable.']
+ ],
+ deadlines: [
+  ['⏰','Match-by-match deadline','Every game has its own deadline. The whole stage does not lock at once.'],
+  ['🌎','Time zone','The rule uses America/New_York time, so the deadline is midnight US East Coast time.'],
+  ['🚫','After the deadline','The website disables the inputs and the database rejects late prediction edits.'],
+  ['✅','Future games','Missing one locked game does not stop you from predicting later open games.']
+ ],
+ scoring: [
+  ['3️⃣','Exact score','3 points if the regulation score is exactly correct.'],
+  ['2️⃣','Goal difference','2 points if the goal difference is correct but the exact score is not.'],
+  ['1️⃣','Correct result','1 point if you get the winner or draw right but not the exact score or goal difference.'],
+  ['🥅','Penalties','For knockout matches tied after regulation, a correct penalty winner can add a bonus point.']
+ ],
+ bracket: [
+  ['📊','Live bracket','The bracket is based on official results entered by Admin.'],
+  ['🔭','Projected matchups','Future matchups can appear before a stage is complete, but they are preview-only.'],
+  ['🔓','When a round opens','A round opens only when the previous stage is fully complete and all teams are known.'],
+  ['🧬','Why this is fairer','Users predict official real matchups, not hypothetical games from an old full-tournament forecast.']
+ ],
+ thirds: [
+  ['🥉','Eight teams advance','The best eight third-place teams from the twelve groups advance to the Round of 32.'],
+  ['📋','Ranking order','They are ranked by points, goal difference, goals scored, Fair Play, and FIFA ranking.'],
+  ['🧩','Match assignment','Once the eight groups are known, the official matrix assigns those teams into the Round of 32 slots.']
+ ],
+ account: [
+  ['🔐','Sign in required','You need an account to save predictions and appear on the leaderboard.'],
+  ['💾','Saved predictions','Predictions are stored in the database and restored when you sign back in.'],
+  ['🔑','Password reset','Use the Forgot password link in the sign-in modal if you need to reset access.']
+ ],
+ admin: [
+  ['⚙️','Admin results','Admin enters official results and penalty scores when needed.'],
+  ['👀','Read-only user viewer','Admin can select a user and review predictions next to official results, but cannot edit them in that viewer.'],
+  ['🔓','Phase unlocks','Admin phase unlocks reopen confirmed phases, but they do not bypass the match deadline rule.']
+ ]
+};
+
+const HELP_FAQS = [
+ ['Can I change a prediction after the match locks?','No. Once the midnight ET deadline passes, the match is locked.'],
+ ['Can I predict Round of 32 before the Group Stage is complete?','No. You may see projected Round of 32 matchups, but prediction opens only when all Group Stage official results are entered and official pairings are known.'],
+ ['What happens if I miss one game?','That match stays blank and scores zero. You can still predict future open matches.'],
+ ['Can Admin edit my prediction?','No. The Admin user viewer is read-only. Admin enters official results and can manage phase locks.'],
+ ['How do I reset my password?','Use the Forgot password link in the sign-in modal.'],
+ ['How are best third-place teams selected?','They are ranked by points, goal difference, goals scored, Fair Play, and FIFA ranking.']
+];
+
+let _helpActiveCat = 'popular';
+
+function helpSafe(v) {
+ return String(v ?? '').replace(/[&<>"']/g, ch => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+ }[ch]));
+}
+
+function helpArticleHtml(item, tag='') {
+ const [icon,title,body] = item;
+ return `<div class="help-article">
+  <div class="help-article-icon">${icon}</div>
+  <div>
+   ${tag ? `<div class="help-result-tag">${helpSafe(tag)}</div>` : ''}
+   <h3>${helpSafe(title)}</h3>
+   <p>${helpSafe(body)}</p>
+  </div>
+ </div>`;
+}
+
+function helpFaqHtml(item, open=false) {
+ const [q,a] = item;
+ return `<details class="help-faq"${open ? ' open' : ''}>
+  <summary>${helpSafe(q)}</summary>
+  <div>${helpSafe(a)}</div>
+ </details>`;
+}
+
+function helpPopularTilesHtml() {
+ return `<div class="help-popular-grid">
+  <div class="help-tile green" onclick="renderInstructions('getting')"><div class="help-tile-icon">🚀</div><div class="help-tile-title">Getting Started</div><div class="help-tile-sub">How to play stage by stage</div></div>
+  <div class="help-tile blue" onclick="renderInstructions('deadlines')"><div class="help-tile-icon">🔒</div><div class="help-tile-title">Deadlines</div><div class="help-tile-sub">When matches lock</div></div>
+  <div class="help-tile indigo" onclick="renderInstructions('scoring')"><div class="help-tile-icon">🏆</div><div class="help-tile-title">Scoring</div><div class="help-tile-sub">How points are awarded</div></div>
+  <div class="help-tile gold" onclick="renderInstructions('bracket')"><div class="help-tile-icon">🔭</div><div class="help-tile-title">Live Bracket</div><div class="help-tile-sub">Official and projected matchups</div></div>
+  <div class="help-tile coral" onclick="renderInstructions('thirds')"><div class="help-tile-icon">🥉</div><div class="help-tile-title">Best Third Places</div><div class="help-tile-sub">How teams advance</div></div>
+  <div class="help-tile cyan" onclick="renderInstructions('account')"><div class="help-tile-icon">👤</div><div class="help-tile-title">Account Help</div><div class="help-tile-sub">Passwords and saved picks</div></div>
+ </div>`;
+}
+
+function helpDefaultContent(activeCat='popular') {
+ const catLabel = (HELP_CATEGORIES.find(c=>c[0]===activeCat)||HELP_CATEGORIES[0])[1];
+ const articleHtml = (HELP_ARTICLES[activeCat] || HELP_ARTICLES.popular).map(x => helpArticleHtml(x)).join('');
+ const faqHtml = HELP_FAQS.slice(0,4).map((x,i)=>helpFaqHtml(x, i===0)).join('');
+ return `
+  ${activeCat==='popular' ? helpPopularTilesHtml() : ''}
+  <div class="help-article-panel" id="helpArticlePanel">
+   <div class="help-article-header">
+    <h2>${activeCat==='popular'?'Most Popular Questions':helpSafe(catLabel)}</h2>
+    <p>${activeCat==='popular'?'Start here for the most useful answers.':'Focused help for this topic.'}</p>
+   </div>
+   <div class="help-article-list" id="helpArticleList">${articleHtml}</div>
+  </div>
+  <div class="help-faq-list" id="helpFaqList">${faqHtml}</div>`;
+}
+
+function helpSearchItems() {
+ const items = [];
+ for (const [catId, catLabel] of HELP_CATEGORIES) {
+  for (const article of (HELP_ARTICLES[catId] || [])) {
+   const [icon,title,body] = article;
+   items.push({type:'Article', catId, catLabel, icon, title, body, search:`${catLabel} ${title} ${body}`.toLowerCase()});
+  }
+ }
+ for (const faq of HELP_FAQS) {
+  const [title, body] = faq;
+  items.push({type:'FAQ', catId:'faq', catLabel:'FAQ', icon:'❓', title, body, search:`FAQ ${title} ${body}`.toLowerCase()});
+ }
+ return items;
+}
+
+function renderHelpSearchResults(query) {
+ const q = String(query || '').toLowerCase().trim();
+ const dyn = document.getElementById('helpDynamicContent');
+ if (!dyn) return;
+ if (!q) {
+  dyn.innerHTML = helpDefaultContent(_helpActiveCat);
+  return;
+ }
+ const words = q.split(/\s+/).filter(Boolean);
+ const results = helpSearchItems().filter(item => words.every(w => item.search.includes(w)));
+ if (!results.length) {
+  dyn.innerHTML = `<div class="help-no-results">
+   <div style="font-size:34px;margin-bottom:8px">🔎</div>
+   <div style="font-weight:900;color:var(--page-text);margin-bottom:4px">No results found</div>
+   <div>Try words like <strong>deadline</strong>, <strong>scoring</strong>, <strong>bracket</strong>, <strong>password</strong>, or <strong>third</strong>.</div>
+  </div>`;
+  return;
+ }
+ const resultHtml = results.map(r => helpArticleHtml([r.icon, r.title, r.body], `${r.type} · ${r.catLabel.replace(/^[^A-Za-z0-9]+\\s*/, '')}`)).join('');
+ dyn.innerHTML = `<div class="help-article-panel">
+  <div class="help-article-header">
+   <h2>Search results</h2>
+   <p>${results.length} result${results.length!==1?'s':''} for “${helpSafe(query)}”</p>
+  </div>
+  <div class="help-article-list">${resultHtml}</div>
+ </div>`;
+}
+
 function renderInstructions(activeCat='popular') {
+ _helpActiveCat = activeCat || 'popular';
  const container = document.getElementById('instructionsContainer');
  if (!container) return;
+ const catLabel = (HELP_CATEGORIES.find(c=>c[0]===_helpActiveCat)||HELP_CATEGORIES[0])[1];
 
- const categories = [
-  ['popular','⭐ Most Popular'],
-  ['getting','🚀 Getting Started'],
-  ['deadlines','🔒 Deadlines'],
-  ['scoring','🏆 Scoring'],
-  ['bracket','🔭 Bracket'],
-  ['thirds','🥉 Best Third Places'],
-  ['account','👤 Account'],
-  ['admin','⚙️ Admin / Results']
- ];
- const catLabel = (categories.find(c=>c[0]===activeCat)||categories[0])[1];
-
- const sidebar = categories.map(([id,label]) =>
-  `<button class="help-cat${id===activeCat?' active':''}" onclick="renderInstructions('${id}')">${label}</button>`
+ const sidebar = HELP_CATEGORIES.map(([id,label]) =>
+  `<button class="help-cat${id===_helpActiveCat?' active':''}" onclick="renderInstructions('${id}')">${label}</button>`
  ).join('');
-
- const popularTiles = `
-  <div class="help-popular-grid">
-   <div class="help-tile green" onclick="renderInstructions('getting')"><div class="help-tile-icon">🚀</div><div class="help-tile-title">Getting Started</div><div class="help-tile-sub">How to play stage by stage</div></div>
-   <div class="help-tile blue" onclick="renderInstructions('deadlines')"><div class="help-tile-icon">🔒</div><div class="help-tile-title">Deadlines</div><div class="help-tile-sub">When matches lock</div></div>
-   <div class="help-tile indigo" onclick="renderInstructions('scoring')"><div class="help-tile-icon">🏆</div><div class="help-tile-title">Scoring</div><div class="help-tile-sub">How points are awarded</div></div>
-   <div class="help-tile gold" onclick="renderInstructions('bracket')"><div class="help-tile-icon">🔭</div><div class="help-tile-title">Live Bracket</div><div class="help-tile-sub">Official and projected matchups</div></div>
-   <div class="help-tile coral" onclick="renderInstructions('thirds')"><div class="help-tile-icon">🥉</div><div class="help-tile-title">Best Third Places</div><div class="help-tile-sub">How teams advance</div></div>
-   <div class="help-tile cyan" onclick="renderInstructions('account')"><div class="help-tile-icon">👤</div><div class="help-tile-title">Account Help</div><div class="help-tile-sub">Passwords and saved picks</div></div>
-  </div>`;
-
- const articles = {
-  popular: [
-   ['🚀','How the game works','Predict only the current official stage. The Group Stage is open first. Later rounds open only when the prior stage is finished and official matchups are known.'],
-   ['🔒','When predictions lock','Each match locks at 12:00 AM US Eastern time on the calendar day of that match. You can edit until 11:59 PM ET the day before.'],
-   ['🔭','Why future rounds can appear','The Bracket can show projected future matchups based on official results already entered by Admin. These projections are read-only and can change.'],
-   ['🏆','How scoring works','Exact regulation score gives 3 points, correct goal difference gives 2, correct result gives 1, and knockout penalty winner can add 1 point.']
-  ],
-  getting: [
-   ['1️⃣','Step 1 — Fill open predictions','Go to Predictions and enter scores for the currently open stage. At the start, that is the Group Stage.'],
-   ['2️⃣','Step 2 — Save automatically','Scores save as you type. A Saved indicator appears after the app confirms the prediction.'],
-   ['3️⃣','Step 3 — Confirm the stage','When your still-open matches are complete, confirm the phase to lock your predictions.'],
-   ['4️⃣','Step 4 — Keep playing','If you miss a locked game, it stays blank and scores zero, but future open matches remain playable.']
-  ],
-  deadlines: [
-   ['⏰','Match-by-match deadline','Every game has its own deadline. The whole stage does not lock at once.'],
-   ['🌎','Time zone','The rule uses America/New_York time, so the deadline is midnight US East Coast time.'],
-   ['🚫','After the deadline','The website disables the inputs and the database rejects late prediction edits.'],
-   ['✅','Future games','Missing one locked game does not stop you from predicting later open games.']
-  ],
-  scoring: [
-   ['3️⃣','Exact score','3 points if the regulation score is exactly correct.'],
-   ['2️⃣','Goal difference','2 points if the goal difference is correct but the exact score is not.'],
-   ['1️⃣','Correct result','1 point if you get the winner or draw right but not the exact score or goal difference.'],
-   ['🥅','Penalties','For knockout matches tied after regulation, a correct penalty winner can add a bonus point.']
-  ],
-  bracket: [
-   ['📊','Live bracket','The bracket is based on official results entered by Admin.'],
-   ['🔭','Projected matchups','Future matchups can appear before a stage is complete, but they are preview-only.'],
-   ['🔓','When a round opens','A round opens only when the previous stage is fully complete and all teams are known.'],
-   ['🧬','Why this is fairer','Users predict official real matchups, not hypothetical games from an old full-tournament forecast.']
-  ],
-  thirds: [
-   ['🥉','Eight teams advance','The best eight third-place teams from the twelve groups advance to the Round of 32.'],
-   ['📋','Ranking order','They are ranked by points, goal difference, goals scored, Fair Play, and FIFA ranking.'],
-   ['🧩','Match assignment','Once the eight groups are known, the official matrix assigns those teams into the Round of 32 slots.']
-  ],
-  account: [
-   ['🔐','Sign in required','You need an account to save predictions and appear on the leaderboard.'],
-   ['💾','Saved predictions','Predictions are stored in the database and restored when you sign back in.'],
-   ['🔑','Password reset','Use the Forgot password link in the sign-in modal if you need to reset access.']
-  ],
-  admin: [
-   ['⚙️','Admin results','Admin enters official results and penalty scores when needed.'],
-   ['👀','Read-only user viewer','Admin can select a user and review predictions next to official results, but cannot edit them in that viewer.'],
-   ['🔓','Phase unlocks','Admin phase unlocks reopen confirmed phases, but they do not bypass the match deadline rule.']
-  ]
- };
-
- const articleHtml = (articles[activeCat] || articles.popular).map(([icon,title,body]) => `
-  <div class="help-article">
-   <div class="help-article-icon">${icon}</div>
-   <div><h3>${title}</h3><p>${body}</p></div>
-  </div>`).join('');
 
  container.innerHTML = `
   <div class="help-breadcrumb">Support » FAQs</div>
@@ -1702,40 +1799,21 @@ function renderInstructions(activeCat='popular') {
    <main class="help-main">
     <div class="help-topbar">
      <div>
-      <div class="help-section-label">${activeCat==='popular'?'Most Popular':catLabel}</div>
+      <div class="help-section-label">${_helpActiveCat==='popular'?'Most Popular':helpSafe(catLabel)}</div>
       <div style="color:var(--text-muted);font-size:13px">Find quick answers about predictions, deadlines, scoring, and the live bracket.</div>
      </div>
      <div class="help-search">
-      <input id="helpSearchInput" placeholder="Search FAQs..." oninput="filterHelpContent(this.value)">
+      <input id="helpSearchInput" placeholder="Search FAQs..." oninput="filterHelpContent(this.value)" autocomplete="off">
       <span>🔍</span>
      </div>
     </div>
-
-    ${activeCat==='popular' ? popularTiles : ''}
-
-    <div class="help-article-panel" id="helpArticlePanel">
-     <div class="help-article-header">
-      <h2>${activeCat==='popular'?'Most Popular Questions':catLabel}</h2>
-      <p>${activeCat==='popular'?'Start here for the most useful answers.':'Focused help for this topic.'}</p>
-     </div>
-     <div class="help-article-list" id="helpArticleList">${articleHtml}</div>
-    </div>
-
-    <div class="help-faq-list" id="helpFaqList">
-     <details class="help-faq"><summary>Can I change a prediction after the match locks?</summary><div>No. Once the midnight ET deadline passes, the match is locked.</div></details>
-     <details class="help-faq"><summary>Can I predict Round of 32 before the Group Stage is complete?</summary><div>No. You may see projected Round of 32 matchups, but prediction opens only when all Group Stage official results are entered and official pairings are known.</div></details>
-     <details class="help-faq"><summary>What happens if I miss one game?</summary><div>That match stays blank and scores zero. You can still predict future open matches.</div></details>
-     <details class="help-faq"><summary>Can Admin edit my prediction?</summary><div>No. The Admin user viewer is read-only. Admin enters official results and can manage phase locks.</div></details>
-    </div>
+    <div id="helpDynamicContent">${helpDefaultContent(_helpActiveCat)}</div>
    </main>
   </div>`;
 }
 
 function filterHelpContent(query) {
- const q = String(query || '').toLowerCase().trim();
- document.querySelectorAll('#helpArticleList .help-article, #helpFaqList .help-faq').forEach(el => {
-  el.style.display = !q || el.textContent.toLowerCase().includes(q) ? '' : 'none';
- });
+ renderHelpSearchResults(query);
 }
 
 
